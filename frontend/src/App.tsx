@@ -16,6 +16,7 @@ import { GoalsPage }    from '@/pages/GoalsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { ImportPage }   from '@/pages/ImportPage'
 import { VisibilityProvider } from '@/context/VisibilityContext'
+import { ReportsPage } from '@/pages/ReportsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } }
@@ -42,6 +43,7 @@ export default function App() {
                   <Route path="goals"    element={<GoalsPage />} />
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="import" element={<ImportPage />} />
+                  <Route path="reports" element={<ReportsPage />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

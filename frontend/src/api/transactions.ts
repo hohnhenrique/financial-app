@@ -11,10 +11,25 @@ export interface TransactionPayload {
   notes?: string
 }
 
+export interface TransactionFilters {
+  type?: string
+  category_id?: string
+  account_id?: string
+  date_from?: string
+  date_to?: string
+  amount_from?: string
+  amount_to?: string
+  search?: string
+  sort_by?: string
+  sort_dir?: string
+  page?: number
+  per_page?: number
+}
+
 export const transactionsApi = {
-  list: (page = 1, perPage = 10) =>
+  list: (page = 1, perPage = 10, filters: Omit<TransactionFilters, 'page'|'per_page'> = {}) =>
     client.get<ApiResponse<PaginatedResponse<Transaction>>>('/transactions', {
-      params: { page, per_page: perPage },
+      params: { page, per_page: perPage, ...filters },
     }),
 
   get: (id: string) =>
