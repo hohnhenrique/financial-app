@@ -4,27 +4,25 @@ declare(strict_types=1);
 
 namespace App\Domain\Transaction;
 
-use App\Domain\Shared\Money;
-
 final class TransactionService
 {
     public function __construct(
         private readonly TransactionRepositoryInterface $repository,
     ) {}
 
-    public function listByUser(int $userId): array
+    public function listByUser(int $userId, array $filters = []): array
     {
-        return $this->repository->findByUser($userId);
+        return $this->repository->findByUser($userId, $filters);
     }
 
-    public function listPaginated(int $userId, int $page, int $perPage): array
+    public function listPaginated(int $userId, int $page, int $perPage, array $filters = []): array
     {
-        return $this->repository->findByUserPaginated($userId, $page, $perPage);
+        return $this->repository->findByUserPaginated($userId, $page, $perPage, $filters);
     }
 
-    public function countByUser(int $userId): int
+    public function countByUser(int $userId, array $filters = []): int
     {
-        return $this->repository->countByUser($userId);
+        return $this->repository->countByUser($userId, $filters);
     }
 
     public function findById(int $id, int $userId): Transaction
@@ -48,6 +46,11 @@ final class TransactionService
         return $this->repository->expensesByCategory($userId, $yearMonth);
     }
 
+    public function reportByCategory(int $userId, array $filters): array
+    {
+        return $this->repository->reportByCategory($userId, $filters);
+    }
+
     public function create(TransactionDTO $dto): Transaction
     {
         $this->validate($dto);
@@ -66,32 +69,10 @@ final class TransactionService
         return $this->repository->delete($id, $userId);
     }
 
-    public function calculateBalance(array $transactions): Money
-    {
-        $balance = Money::ofCents(0);
-
-        foreach ($transactions as $tx) {
-            $amount = Money::ofCents($tx->amountCents);
-            $balance = $tx->isIncome()
-                ? $balance->add($amount)
-                : $balance->subtract($amount);
-        }
-
-        return $balance;
-    }
-
     private function validate(TransactionDTO $dto): void
     {
-        if ($dto->amount->isZero()) {
-            throw new \InvalidArgumentException('O valor deve ser maior que zero.');
-        }
-
-        if (!in_array($dto->type, ['income', 'expense', 'transfer'], strict: true)) {
-            throw new \InvalidArgumentException('Tipo de transação inválido.');
-        }
-
-        if (strlen($dto->description) < 3) {
-            throw new \InvalidArgumentException('Descrição deve ter ao menos 3 caracteres.');
-        }
+        if ($dto->amount->isZero()) throw new \InvalidArgumentException('O valor deve ser maior que zero.');
+        if (!in_array($dto->type, ['income','expense','transfer'], strict: true)) throw new \InvalidArgumentException('Tipo inválido.');
+        if (strlen($dto->description) < 3) throw new \InvalidArgumentException('Descrição deve ter ao menos 3 caracteres.');
     }
 }

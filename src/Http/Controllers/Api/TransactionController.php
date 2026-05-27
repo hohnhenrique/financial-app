@@ -19,20 +19,34 @@ final class TransactionController extends ApiController
     public function index(): string
     {
         $this->requireAuth();
+
         $userId  = $this->userId();
         $page    = max(1, (int) ($_GET['page']     ?? 1));
         $perPage = (int) ($_GET['per_page'] ?? 10);
         $perPage = in_array($perPage, [10, 25, 50, 100]) ? $perPage : 10;
 
-        $items = $this->service->listPaginated($userId, $page, $perPage);
-        $total = $this->service->countByUser($userId);
+        $filters = array_filter([
+            'type'        => $_GET['type']        ?? '',
+            'category_id' => $_GET['category_id'] ?? '',
+            'account_id'  => $_GET['account_id']  ?? '',
+            'date_from'   => $_GET['date_from']   ?? '',
+            'date_to'     => $_GET['date_to']     ?? '',
+            'amount_from' => $_GET['amount_from'] ?? '',
+            'amount_to'   => $_GET['amount_to']   ?? '',
+            'search'      => $_GET['search']      ?? '',
+            'sort_by'     => $_GET['sort_by']     ?? 'date',
+            'sort_dir'    => $_GET['sort_dir']    ?? 'DESC',
+        ]);
+
+        $items = $this->service->listPaginated($userId, $page, $perPage, $filters);
+        $total = $this->service->countByUser($userId, $filters);
 
         return $this->success([
-            'items'      => array_map(fn($tx) => $this->serialize($tx), $items),
-            'total'      => $total,
-            'page'       => $page,
-            'per_page'   => $perPage,
-            'total_pages'=> (int) ceil($total / $perPage),
+            'items'       => array_map(fn($tx) => $this->serialize($tx), $items),
+            'total'       => $total,
+            'page'        => $page,
+            'per_page'    => $perPage,
+            'total_pages' => (int) ceil($total / $perPage),
         ]);
     }
 
@@ -40,8 +54,7 @@ final class TransactionController extends ApiController
     {
         $this->requireAuth();
         try {
-            $tx = $this->service->findById((int) $id, $this->userId());
-            return $this->success($this->serialize($tx));
+            return $this->success($this->serialize($this->service->findById((int) $id, $this->userId())));
         } catch (\RuntimeException $e) {
             return $this->error($e->getMessage(), 404);
         }
@@ -93,6 +106,7 @@ final class TransactionController extends ApiController
             'notes'            => $tx->notes,
             'transaction_date' => $tx->transactionDate,
             'category_name'    => $tx->categoryName,
+            'category_color'   => $tx->categoryColor ?? null,
             'account_name'     => $tx->accountName,
             'created_at'       => $tx->createdAt,
         ];
