@@ -21,6 +21,8 @@ final class DashboardController extends ApiController
 
         $userId    = $this->userId();
         $yearMonth = $_GET['month'] ?? date('Y-m');
+        $prevMonth = date('Y-m', strtotime('first day of last month'));
+        $prevSummary = $this->service->monthlySummary($userId, $prevMonth);
 
         return $this->success([
             'summary'             => $this->service->monthlySummary($userId, $yearMonth),
@@ -30,6 +32,8 @@ final class DashboardController extends ApiController
                 fn($tx) => $this->serializeTransaction($tx),
                 $this->service->listPaginated($userId, 1, 8)
             ),
+            'previous_summary' => $prevSummary,
+            'previous_month'   => $prevMonth,
         ]);
     }
 
