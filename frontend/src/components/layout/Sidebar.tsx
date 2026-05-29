@@ -189,7 +189,7 @@ export function Sidebar() {
   return (
     <aside
       className="w-64 min-h-screen flex flex-col fixed left-0 top-0 bottom-0 z-30 overflow-hidden"
-      style={{ background: 'linear-gradient(160deg, #0f172a 0%, #1e293b 100%)' }}
+      style={{ background: 'linear-gradient(160deg, var(--sidebar-from, #0f172a) 0%, var(--sidebar-to, #1e293b) 100%)' }}
     >
       <div className="absolute right-0 top-0 bottom-0 w-px bg-white/5" />
 

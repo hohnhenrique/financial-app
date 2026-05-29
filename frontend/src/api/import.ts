@@ -1,3 +1,4 @@
+import client, { getCsrfToken } from './client'
 import axios from 'axios'
 import type { ApiResponse } from '@/types'
 
@@ -7,7 +8,6 @@ export interface ImportedRow {
   amount_cents: number
   type: 'income' | 'expense'
   original_category: string
-  // campos de seleção pelo usuário
   selected: boolean
   account_id: string
   category_id: string
@@ -24,21 +24,26 @@ export const importApi = {
     const form = new FormData()
     form.append('file', file)
     form.append('bank', bank)
+
+    // Usa axios direto mas injeta o CSRF manualmente (FormData não usa Content-Type: json)
     return axios.post<ApiResponse<ImportPreview>>('/api/import/preview', form, {
       withCredentials: true,
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'X-CSRF-Token': getCsrfToken(),
+      },
     })
   },
 
   confirm: (transactions: ImportedRow[]) =>
-    axios.post<ApiResponse<{ imported: number; skipped: number }>>('/api/import/confirm', {
+    client.post<ApiResponse<{ imported: number; skipped: number }>>('/api/import/confirm', {
       transactions: transactions.filter(t => t.selected).map(t => ({
-        date:        t.date,
-        description: t.description,
+        date:         t.date,
+        description:  t.description,
         amount_cents: t.amount_cents,
-        type:        t.type,
-        account_id:  t.account_id,
-        category_id: t.category_id,
+        type:         t.type,
+        account_id:   t.account_id,
+        category_id:  t.category_id,
       })),
-    }, { withCredentials: true }),
+    }),
 }

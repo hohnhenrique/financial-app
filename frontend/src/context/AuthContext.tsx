@@ -39,6 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const me = await authApi.me()
       const token = me.headers['x-csrf-token']
+      localStorage.setItem('session_renewed_at', String(Date.now()))
+
       if (token) setCsrfToken(token)
     } catch {
       // ignora — o token virá no próximo interceptor de response

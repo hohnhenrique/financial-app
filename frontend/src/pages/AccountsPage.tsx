@@ -59,8 +59,8 @@ export function AccountsPage() {
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[380px_1fr] gap-6">
       <Card title={editing ? 'Editar Conta' : 'Nova Conta'} subtitle="Cadastre bancos, carteiras e cartões.">
-        <div className="px-6 pb-6 space-y-5">
-          {error   && <Alert type="error"   message={error} />}
+        <div className="px-6 pt-5 pb-6 space-y-5">
+        {error   && <Alert type="error"   message={error} />}
           {success && <Alert type="success" message={success} />}
           <Input label="Nome" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: Nubank, Carteira" required />
           <Select label="Tipo" options={TYPES} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} required />

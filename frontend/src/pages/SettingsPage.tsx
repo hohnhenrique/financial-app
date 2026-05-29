@@ -4,6 +4,7 @@ import { settingsApi, type UserSettings } from '@/api/settings'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
+import { applyColors } from '@/hooks/useApplySettings'
 
 const SESSION_OPTIONS = [
   { value: 30,   label: '30 minutos' },
@@ -50,12 +51,17 @@ export function SettingsPage() {
 
   const saveMut = useMutation({
     mutationFn: (values: Partial<UserSettings>) => settingsApi.update(values),
-    onSuccess: (res) => {
-      setMsg({ type: 'success', text: 'Configurações salvas! Recarregue para ver as cores aplicadas.' })
-      qc.setQueryData(['settings'], res.data.data)
-      // Aplica as cores no CSS imediatamente
+    onSuccess: () => {
+      setMsg({ type: 'success', text: 'Configurações salvas!' })
+      qc.invalidateQueries({ queryKey: ['settings'] })
       applyColors(form.primary_color, form.sidebar_color_from, form.sidebar_color_to)
     },
+    // onSuccess: (res) => {
+    //   setMsg({ type: 'success', text: 'Configurações salvas! Recarregue para ver as cores aplicadas.' })
+    //   qc.setQueryData(['settings'], res.data.data)
+    //   // Aplica as cores no CSS imediatamente
+    //   applyColors(form.primary_color, form.sidebar_color_from, form.sidebar_color_to)
+    // },
     onError: () => setMsg({ type: 'error', text: 'Erro ao salvar.' }),
   })
 

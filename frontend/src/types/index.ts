@@ -11,6 +11,7 @@ export interface Account {
   type: 'checking' | 'savings' | 'wallet' | 'investment' | 'credit_card'
   currency: string
   initial_balance_cents: number
+  real_balance_cents: number
   color: string
   is_hidden: boolean
   created_at: string
@@ -80,4 +81,6 @@ export interface DashboardData {
   chart_months: ChartMonth[]
   expenses_by_category: CategoryExpense[]
   recent_transactions: Transaction[]
+  previous_summary: DashboardSummary
+  previous_month: string
 }

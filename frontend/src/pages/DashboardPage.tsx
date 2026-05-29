@@ -106,6 +106,11 @@ export function DashboardPage() {
     name: c.name, value: +(c.total / 100).toFixed(2), color: c.color,
   }))
 
+  const monthLabel = (ym: string) => {
+    const [y, m] = ym.split('-')
+    return `${MONTHS[parseInt(m)-1]}/${y.slice(2)}`
+  }
+
   // Acúmulo do saldo (patrimônio acumulado)
   let accumulated = 0
   const accData = chartData.map(m => {
@@ -164,21 +169,30 @@ export function DashboardPage() {
       </div>
 
       {/* ── Cards ───────────────────────────────────────────────────────────── */}
-      <div className={`grid grid-cols-1 md:grid-cols-${cards[view].length} gap-5`}>
-        {cards[view].map(c => (
-          <div key={c.label} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6 flex items-center gap-5">
-            <div className={`w-14 h-14 rounded-2xl ${c.bg} flex items-center justify-center flex-shrink-0`}>
-              <svg className={`w-7 h-7 ${c.color}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={c.icon} />
-              </svg>
+      {(() => {
+        const colsClass: Record<number, string> = {
+          1: 'md:grid-cols-1',
+          2: 'md:grid-cols-2',
+          3: 'md:grid-cols-3',
+        }
+        return (
+            <div className={`grid grid-cols-1 ${colsClass[cards[view].length] ?? 'md:grid-cols-3'} gap-5`}>
+              {cards[view].map(c => (
+                  <div key={c.label} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6 flex items-center gap-5">
+                    <div className={`w-14 h-14 rounded-2xl ${c.bg} flex items-center justify-center flex-shrink-0`}>
+                      <svg className={`w-7 h-7 ${c.color}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={c.icon} />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wide">{c.label}</p>
+                      <MoneyValue cents={c.value} className={`text-2xl font-bold mt-1 ${c.color}`} />
+                    </div>
+                  </div>
+              ))}
             </div>
-            <div>
-              <p className="text-xs text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wide">{c.label}</p>
-              <MoneyValue cents={c.value} className="text-2xl font-bold mt-1" />
-            </div>
-          </div>
-        ))}
-      </div>
+        )
+      })()}
 
       {/* ── Receitas vs Despesas + Categorias ─────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
@@ -315,6 +329,54 @@ export function DashboardPage() {
             </ResponsiveContainer>
           </div>
         </Card>
+      )}
+
+      {/* Comparativo mês anterior */}
+      {data?.previous_summary && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Comparativo com mês anterior</h3>
+              <span className="text-xs text-slate-400 dark:text-slate-500">{monthLabel(data.previous_month)} vs {monthLabel(month)}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                {
+                  label: 'Receitas',
+                  current: income,
+                  prev: data.previous_summary.total_income,
+                  positiveIsGood: true,
+                },
+                {
+                  label: 'Despesas',
+                  current: expense,
+                  prev: data.previous_summary.total_expense,
+                  positiveIsGood: false,
+                },
+                {
+                  label: 'Saldo',
+                  current: balance,
+                  prev: data.previous_summary.total_income - data.previous_summary.total_expense,
+                  positiveIsGood: true,
+                },
+              ].map(c => {
+                const diff    = c.current - c.prev
+                const pct     = c.prev > 0 ? Math.round((diff / c.prev) * 100) : null
+                const isGood  = c.positiveIsGood ? diff >= 0 : diff <= 0
+                const diffColor = diff === 0 ? 'text-slate-400' : isGood ? 'text-emerald-500' : 'text-red-500'
+                return (
+                    <div key={c.label} className="text-center">
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">{c.label}</p>
+                      <MoneyValue cents={c.current} className="text-sm font-bold text-slate-700 dark:text-slate-200" />
+                      {pct !== null && (
+                          <p className={`text-xs font-semibold mt-0.5 ${diffColor}`}>
+                            {diff >= 0 ? '+' : ''}{pct}%
+                          </p>
+                      )}
+                    </div>
+                )
+              })}
+            </div>
+          </div>
       )}
 
       {/* ── Últimas movimentações ──────────────────────────────────────────── */}
