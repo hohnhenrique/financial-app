@@ -32,7 +32,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               'w-full px-4 py-3 border rounded-xl text-sm transition-all focus:outline-none focus:ring-2',
               'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700',
               'text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500',
-              'focus:ring-blue-500/20 focus:border-blue-400',
+              'focus:ring-2 focus:ring-offset-0',
               error && 'border-red-400 focus:border-red-400 focus:ring-red-400/20',
               prefix && 'pl-10',
               className

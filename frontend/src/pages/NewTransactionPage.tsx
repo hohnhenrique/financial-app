@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { transactionsApi } from '@/api/transactions'
 import { accountsApi } from '@/api/accounts'
@@ -8,68 +7,105 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { Alert } from '@/components/ui/Alert'
 import { MoneyInput } from '@/components/ui/MoneyInput'
 import { useMoneyInput } from '@/hooks/useMoneyInput'
+import { useToast } from '@/context/ToastContext'
+
+function todayISO() {
+  return new Date().toISOString().split('T')[0]
+}
 
 export function NewTransactionPage() {
-  const navigate = useNavigate()
-  const qc       = useQueryClient()
+  const qc    = useQueryClient()
+  const toast = useToast()
 
-  const [type, setType]               = useState<'expense' | 'income'>('expense')
-  const [date, setDate]               = useState(new Date().toISOString().split('T')[0])
-  const [categoryId, setCategoryId]   = useState('')
-  const [accountId, setAccountId]     = useState('')
+  // ── Campos do formulário ──────────────────────────────────────────────────
+  const [type,        setType]        = useState<'expense' | 'income'>('expense')
+  const [date,        setDate]        = useState(todayISO())
+  const [categoryId,  setCategoryId]  = useState('')
+  const [accountId,   setAccountId]   = useState('')
   const [description, setDescription] = useState('')
-  const [notes, setNotes]             = useState('')
-  const [error, setError]             = useState('')
-
+  const [notes,       setNotes]       = useState('')
   const money = useMoneyInput(0)
 
+  // ── Queries ───────────────────────────────────────────────────────────────
   const { data: accountsData } = useQuery({
-    queryKey: ['accounts-all'],
-    queryFn:  () => accountsApi.listAll().then(r => r.data.data),
-  })
-  const { data: categories } = useQuery({
-    queryKey: ['categories-all'],
-    queryFn:  () => categoriesApi.list().then(r => r.data.data),
+    queryKey:       ['accounts-all'],
+    queryFn:        () => accountsApi.listAll().then(r => r.data.data),
+    staleTime:      0,
+    refetchOnMount: true,
   })
 
-  const accounts  = accountsData?.items ?? []
-  const catOptions = (categories ?? []).filter(c => !c.is_archived).map(c => ({ value: String(c.id), label: c.name }))
+  const { data: categories } = useQuery({
+    queryKey:       ['categories-all'],
+    queryFn:        () => categoriesApi.list().then(r => r.data.data),
+    staleTime:      0,
+    refetchOnMount: true,
+  })
+
+  const accounts   = accountsData?.items ?? []
+  const catOptions = (categories ?? [])
+    .filter(c => !c.is_archived)
+    .map(c => ({ value: String(c.id), label: c.name }))
   const accOptions = accounts.map(a => ({ value: String(a.id), label: a.name }))
 
+  // ── Reset do formulário ───────────────────────────────────────────────────
+  const resetForm = () => {
+    setType('expense')
+    setDate(todayISO())
+    setCategoryId('')
+    setAccountId('')
+    setDescription('')
+    setNotes('')
+    money.reset(0)
+  }
+
+  // ── Mutation ──────────────────────────────────────────────────────────────
   const createMut = useMutation({
     mutationFn: transactionsApi.create,
     onSuccess: () => {
+      // Invalida caches para atualizar dashboard e listagem
       qc.invalidateQueries({ queryKey: ['transactions'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
-      navigate('/transactions')
+
+      // Limpa o formulário e mostra toast
+      resetForm()
+      toast.success('Movimentação cadastrada com sucesso!')
     },
     onError: (e: unknown) => {
-      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setError(msg ?? 'Erro ao salvar.')
+      const msg = (e as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message
+      toast.error(msg ?? 'Erro ao salvar movimentação.')
     },
   })
 
   const handleSubmit = () => {
-    setError('')
+    // Validação mínima no frontend
+    if (!description.trim()) { toast.error('Informe uma descrição.'); return }
+    if (money.rawCents === 0) { toast.error('Informe um valor maior que zero.'); return }
+    if (!categoryId)          { toast.error('Selecione uma categoria.'); return }
+    if (!accountId)           { toast.error('Selecione uma conta.'); return }
+
     createMut.mutate({
       type,
-      amount:           money.apiValue,
+      amount:           money.apiValue,   // "400,00" — formato BR correto
       transaction_date: date,
       category_id:      categoryId,
       account_id:       accountId,
-      description,
-      notes,
+      description:      description.trim(),
+      notes:            notes.trim(),
     })
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-2xl mx-auto">
-      <Card title="Nova Movimentação" subtitle="Preencha os dados da receita ou despesa." padding>
+      <Card
+        title="Nova Movimentação"
+        subtitle="Preencha os dados da receita ou despesa."
+        padding
+      >
         <div className="space-y-6">
-          {error && <Alert type="error" message={error} />}
 
           {/* Tipo */}
           <div>
@@ -79,7 +115,13 @@ export function NewTransactionPage() {
             <div className="grid grid-cols-2 gap-3">
               {(['expense', 'income'] as const).map(t => (
                 <label key={t} className="cursor-pointer">
-                  <input type="radio" className="sr-only" value={t} checked={type === t} onChange={() => setType(t)} />
+                  <input
+                    type="radio"
+                    className="sr-only"
+                    value={t}
+                    checked={type === t}
+                    onChange={() => setType(t)}
+                  />
                   <div className={`flex items-center justify-center gap-2 border-2 rounded-xl py-3 text-sm font-medium transition-all ${
                     type === t
                       ? t === 'expense'
@@ -89,7 +131,9 @@ export function NewTransactionPage() {
                   }`}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d={t === 'expense' ? 'M17 13l-5 5m0 0l-5-5m5 5V6' : 'M7 11l5-5m0 0l5 5m-5-5v12'} />
+                        d={t === 'expense'
+                          ? 'M17 13l-5 5m0 0l-5-5m5 5V6'
+                          : 'M7 11l5-5m0 0l5 5m-5-5v12'} />
                     </svg>
                     {t === 'expense' ? 'Despesa' : 'Receita'}
                   </div>
@@ -147,30 +191,41 @@ export function NewTransactionPage() {
           {/* Anotações */}
           <div>
             <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-              Anotações <span className="text-xs font-normal text-slate-400">(opcional)</span>
+              Anotações{' '}
+              <span className="text-xs font-normal text-slate-400">(opcional)</span>
             </label>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={3}
               placeholder="Informações adicionais..."
-              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all resize-none"
+              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl
+                         bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200
+                         placeholder-slate-400 dark:placeholder-slate-500 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400
+                         transition-all resize-none"
             />
           </div>
 
-          {/* Botões */}
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={() => navigate('/transactions')} className="flex-1">
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              loading={createMut.isPending}
-              className={`flex-1 ${type === 'income' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-red-500 hover:bg-red-600'}`}
-            >
-              Salvar movimentação
-            </Button>
-          </div>
+          {/* Botão */}
+          <Button
+            onClick={handleSubmit}
+            loading={createMut.isPending}
+            size="lg"
+            className={`w-full ${
+              type === 'income'
+                ? 'bg-emerald-500 hover:bg-emerald-600'
+                : 'bg-red-500 hover:bg-red-600'
+            }`}
+          >
+            {createMut.isPending
+              ? 'Salvando...'
+              : type === 'income'
+                ? '↑ Salvar Receita'
+                : '↓ Salvar Despesa'
+            }
+          </Button>
+
         </div>
       </Card>
     </div>

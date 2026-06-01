@@ -2,7 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Cores do sistema — alteradas pelas configurações do usuário */
+:root {
+  --color-primary:  #1B4F8A;
+  --sidebar-from:   #0f172a;
+  --sidebar-to:     #1e293b;
+}
+
 @layer base {
-  * { @apply border-border; }
-  body { @apply bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-200; }
+  body {
+    @apply bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-200;
+  }
+}
+
+/* Botão primário usa a cor do sistema */
+.btn-primary {
+  background-color: var(--color-primary) !important;
+}
+.btn-primary:hover {
+  filter: brightness(0.88);
+}
+
+/* Focus ring usa a cor do sistema */
+.ring-primary {
+  --tw-ring-color: var(--color-primary);
 }

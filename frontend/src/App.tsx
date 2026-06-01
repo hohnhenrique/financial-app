@@ -17,6 +17,7 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { ImportPage }   from '@/pages/ImportPage'
 import { VisibilityProvider } from '@/context/VisibilityContext'
 import { ReportsPage } from '@/pages/ReportsPage'
+import { ToastProvider } from '@/context/ToastContext'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } }
@@ -25,32 +26,34 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <VisibilityProvider>
-          <AuthProvider>
-            <BrowserRouter>
-              <Routes>
-                <Route path="/login"    element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-                <Route element={<AppLayout />}>
-                  <Route index element={<DashboardPage />} />
-                  <Route path="transactions"     element={<TransactionsPage />} />
-                  <Route path="transactions/new" element={<NewTransactionPage />} />
-                  <Route path="accounts"    element={<AccountsPage />} />
-                  <Route path="categories"  element={<CategoriesPage />} />
-                  <Route path="profile"     element={<ProfilePage />} />
-                  <Route path="admin/users" element={<AdminUsersPage />} />
-                  <Route path="goals"    element={<GoalsPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                  <Route path="import" element={<ImportPage />} />
-                  <Route path="reports" element={<ReportsPage />} />
-                </Route>
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </BrowserRouter>
-          </AuthProvider>
-        </VisibilityProvider>
-      </ThemeProvider>
+      <ToastProvider>
+        <ThemeProvider>
+          <VisibilityProvider>
+            <AuthProvider>
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/login"    element={<LoginPage />} />
+                  <Route path="/register" element={<RegisterPage />} />
+                  <Route element={<AppLayout />}>
+                    <Route index element={<DashboardPage />} />
+                    <Route path="transactions"     element={<TransactionsPage />} />
+                    <Route path="transactions/new" element={<NewTransactionPage />} />
+                    <Route path="accounts"    element={<AccountsPage />} />
+                    <Route path="categories"  element={<CategoriesPage />} />
+                    <Route path="profile"     element={<ProfilePage />} />
+                    <Route path="admin/users" element={<AdminUsersPage />} />
+                    <Route path="goals"    element={<GoalsPage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                    <Route path="import" element={<ImportPage />} />
+                    <Route path="reports" element={<ReportsPage />} />
+                  </Route>
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </BrowserRouter>
+            </AuthProvider>
+          </VisibilityProvider>
+        </ThemeProvider>
+      </ToastProvider>
     </QueryClientProvider>
   )
 }

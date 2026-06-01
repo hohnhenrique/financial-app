@@ -15,21 +15,37 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const cached = sessionStorage.getItem('auth_user')
+      return cached ? JSON.parse(cached) : null
+    } catch { return null }
+  })
+
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     authApi.me()
         .then(res => {
           setUser(res.data.data)
-
-          // Captura o CSRF token retornado no header da resposta
+          sessionStorage.setItem('auth_user', JSON.stringify(res.data.data))
           const token = res.headers['x-csrf-token']
           if (token) setCsrfToken(token)
         })
-        .catch(() => setUser(null))
+        .catch(() => {
+          setUser(null)
+          sessionStorage.removeItem('auth_user')
+        })
         .finally(() => setLoading(false))
   }, [])
+
+// No logout, limpe:
+  const logout = async () => {
+    await authApi.logout()
+    setUser(null)
+    sessionStorage.removeItem('auth_user')
+    setCsrfToken('')
+  }
 
   const login = async (email: string, password: string): Promise<void> => {
     const res = await authApi.login(email, password)
@@ -60,11 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const logout = async (): Promise<void> => {
-    await authApi.logout()
-    setUser(null)
-    setCsrfToken('') // limpa o token local ao sair
-  }
+  // const logout = async (): Promise<void> => {
+  //   await authApi.logout()
+  //   setUser(null)
+  //   setCsrfToken('') // limpa o token local ao sair
+  // }
 
   return (
       <AuthContext.Provider value={{ user, loading, login, register, logout }}>

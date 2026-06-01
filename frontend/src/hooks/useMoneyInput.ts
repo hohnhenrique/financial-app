@@ -1,41 +1,32 @@
 import { useState, useCallback } from 'react'
 
 /**
- * Hook para campo de valor com formatação automática em BRL.
- * Retorna { displayValue, rawCents, onChange, reset }
- *
- * displayValue → string formatada para exibição no input (ex: "1.234,56")
- * rawCents     → número inteiro em centavos (ex: 123456)
- * onChange     → handler para o evento input
+ * displayValue → string formatada BR para exibir no input ("1.234,56")
+ * rawCents     → inteiro em centavos (123456)
+ * apiValue     → string BR com vírgula ("1234,56") — o backend já sabe tratar
  */
 export function useMoneyInput(initialCents = 0) {
-  const [cents, setCents] = useState(initialCents)
+  const fmt = (c: number): string =>
+    c === 0 ? '' : (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-  const centsToDisplay = (c: number): string => {
-    if (c === 0) return ''
-    return (c / 100).toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  }
-
-  const [display, setDisplay] = useState(() => centsToDisplay(initialCents))
+  const [cents, setCents]     = useState(initialCents)
+  const [display, setDisplay] = useState(() => fmt(initialCents))
 
   const onChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    // Remove tudo que não for dígito
+    // mantém só dígitos
     const digits = e.target.value.replace(/\D/g, '')
     const c      = parseInt(digits || '0', 10)
     setCents(c)
-    setDisplay(centsToDisplay(c))
+    setDisplay(fmt(c))
   }, [])
 
   const reset = useCallback((newCents = 0) => {
     setCents(newCents)
-    setDisplay(centsToDisplay(newCents))
+    setDisplay(fmt(newCents))
   }, [])
 
-  // String no formato que a API espera (ex: "1234.56")
-  const apiValue = (cents / 100).toFixed(2)
+  // envia no formato BR com vírgula: "400,00" → backend lê corretamente
+  const apiValue = fmt(cents)   // ex: "400,00"  "1.234,56"
 
   return { displayValue: display, rawCents: cents, apiValue, onChange, reset }
 }

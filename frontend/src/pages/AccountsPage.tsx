@@ -34,7 +34,11 @@ export function AccountsPage() {
     queryFn:  () => accountsApi.list({ page, per_page: perPage, sort_by: sortBy, sort_dir: sortDir }).then(r => r.data.data),
   })
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['accounts'] })
+  // const invalidate = () => qc.invalidateQueries({ queryKey: ['accounts'] })
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['accounts'] })
+    qc.invalidateQueries({ queryKey: ['accounts-all'] })
+  }
   const createMut  = useMutation({ mutationFn: accountsApi.create, onSuccess: () => { invalidate(); setForm(EMPTY); setSuccess('Conta cadastrada!') } })
   const updateMut  = useMutation({ mutationFn: ({ id, data }: { id: string; data: AccountPayload }) => accountsApi.update(id, data), onSuccess: () => { invalidate(); setEditing(null); setForm(EMPTY); setSuccess('Conta atualizada!') } })
   const deleteMut  = useMutation({ mutationFn: accountsApi.delete, onSuccess: invalidate })

@@ -1,5 +1,4 @@
-import client, { getCsrfToken } from './client'
-import axios from 'axios'
+import client from './client'
 import type { ApiResponse } from '@/types'
 
 export interface ImportedRow {
@@ -20,23 +19,16 @@ export interface ImportPreview {
 }
 
 export const importApi = {
+  // usa client (com interceptor CSRF) e deixa o axios definir Content-Type+boundary
   preview: (file: File, bank: string) => {
     const form = new FormData()
     form.append('file', file)
     form.append('bank', bank)
-
-    // Usa axios direto mas injeta o CSRF manualmente (FormData não usa Content-Type: json)
-    return axios.post<ApiResponse<ImportPreview>>('/api/import/preview', form, {
-      withCredentials: true,
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        'X-CSRF-Token': getCsrfToken(),
-      },
-    })
+    return client.post<ApiResponse<ImportPreview>>('/import/preview', form)
   },
 
   confirm: (transactions: ImportedRow[]) =>
-    client.post<ApiResponse<{ imported: number; skipped: number }>>('/api/import/confirm', {
+    client.post<ApiResponse<{ imported: number; skipped: number }>>('/import/confirm', {
       transactions: transactions.filter(t => t.selected).map(t => ({
         date:         t.date,
         description:  t.description,

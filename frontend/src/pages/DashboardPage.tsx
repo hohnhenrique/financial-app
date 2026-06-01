@@ -196,22 +196,63 @@ export function DashboardPage() {
 
       {/* ── Receitas vs Despesas + Categorias ─────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <Card title="Receitas vs Despesas" subtitle="Últimos 12 meses" className="xl:col-span-2">
-          <div className="px-6 pb-6">
-            {chartData.length === 0
-              ? <div className="flex items-center justify-center h-52 text-slate-400 text-sm">Sem dados suficientes.</div>
-              : <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={chartData} barGap={3} barCategoryGap="30%">
+        <Card
+            title="Receitas vs Despesas"
+            subtitle="Últimos 12 meses"
+            className="xl:col-span-2"
+        >
+          <div className="px-6 pb-6 flex items-center justify-center min-h-[280px]">
+            {chartData.length === 0 ? (
+                <div className="text-slate-400 text-sm">
+                  Sem dados suficientes.
+                </div>
+            ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart
+                      data={chartData}
+                      barGap={3}
+                      barCategoryGap="30%"
+                      margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                  >
                     <CartesianGrid stroke={gridColor} vertical={false} />
-                    <XAxis dataKey="label" tick={{ fill: tickColor, fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: tickColor, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `R$${v}`} width={70} />
+                    <XAxis
+                        dataKey="label"
+                        tick={{ fill: tickColor, fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                    />
+                    <YAxis
+                        tick={{ fill: tickColor, fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(v) => `R$${v}`}
+                        width={70}
+                    />
                     <Tooltip content={<ChartTooltip dark={dark} />} />
-                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: tickColor }} />
-                    <Bar dataKey="Receitas" fill="#34d399" radius={[6,6,0,0]} maxBarSize={32} />
-                    <Bar dataKey="Despesas" fill="#f87171" radius={[6,6,0,0]} maxBarSize={32} />
+                    <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{
+                          fontSize: 12,
+                          color: tickColor,
+                          paddingTop: 8,
+                        }}
+                    />
+                    <Bar
+                        dataKey="Receitas"
+                        fill="#34d399"
+                        radius={[6, 6, 0, 0]}
+                        maxBarSize={32}
+                    />
+                    <Bar
+                        dataKey="Despesas"
+                        fill="#f87171"
+                        radius={[6, 6, 0, 0]}
+                        maxBarSize={32}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
-            }
+            )}
           </div>
         </Card>
 
@@ -220,33 +261,46 @@ export function DashboardPage() {
             {pieData.length === 0
               ? <div className="flex items-center justify-center h-52 text-slate-400 text-sm">Sem despesas no mês.</div>
               : <>
-                  <ResponsiveContainer width="100%" height={180}>
+                  {/* Pizza — limita legenda a 5 e centraliza */}
+                  <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
-                      <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={52} paddingAngle={2}>
-                        {pieData.map((e, i) => <Cell key={i} fill={e.color} stroke="transparent" />)}
+                      <Pie
+                          data={pieData.slice(0, 5)}   // ← máximo 5 categorias
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="45%"
+                          outerRadius={80}
+                          innerRadius={52}
+                          paddingAngle={2}
+                      >
+                        {pieData.slice(0, 5).map((e, i) => <Cell key={i} fill={e.color} stroke="transparent" />)}
                       </Pie>
-                      <Tooltip formatter={(v) => formatMoney(Math.round(Number(v) * 100))} contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBdr}`, borderRadius: 12 }} />
+                      <Tooltip formatter={(v) => formatMoney(Math.round(Number(v) * 100))}
+                               contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBdr}`, borderRadius: 12 }} />
+                      <Legend iconSize={10} iconType="circle"
+                              wrapperStyle={{ fontSize: 11, color: tickColor, paddingTop: 8 }} />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="space-y-2 px-2">
-                    {pieData.slice(0, 5).map((c, i) => {
-                      const pct = expense > 0 ? Math.round((c.value / (expense / 100)) * 100) : 0
-                      return (
-                        <div key={i}>
-                          <div className="flex justify-between text-xs mb-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full" style={{ background: c.color }} />
-                              <span className="text-slate-600 dark:text-slate-300 truncate max-w-[100px]">{c.name}</span>
-                            </div>
-                            <span className="text-slate-400 dark:text-slate-500 font-medium tabular-nums">{pct}%</span>
-                          </div>
-                          <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: c.color }} />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  {/*<div className="space-y-2 px-2">*/}
+                  {/*  {pieData.slice(0, 0).map((c, i) => {*/}
+                  {/*    const pct = expense > 0 ? Math.round((c.value / (expense / 100)) * 100) : 0*/}
+                  {/*    return (*/}
+                  {/*      <div key={i}>*/}
+                  {/*        <div className="flex justify-between text-xs mb-1">*/}
+                  {/*          <div className="flex items-center gap-1.5">*/}
+                  {/*            <span className="w-2 h-2 rounded-full" style={{ background: c.color }} />*/}
+                  {/*            <span className="text-slate-600 dark:text-slate-300 truncate max-w-[100px]">{c.name}</span>*/}
+                  {/*          </div>*/}
+                  {/*          <span className="text-slate-400 dark:text-slate-500 font-medium tabular-nums">{pct}%</span>*/}
+                  {/*        </div>*/}
+                  {/*        <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">*/}
+                  {/*          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: c.color }} />*/}
+                  {/*        </div>*/}
+                  {/*      </div>*/}
+                  {/*    )*/}
+                  {/*  })}*/}
+                  {/*</div>*/}
                 </>
             }
           </div>
