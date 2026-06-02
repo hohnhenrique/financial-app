@@ -20,7 +20,6 @@ final class CsvImporter
     /** @return ImportedTransaction[] */
     public static function parse(string $content, string $bank): array
     {
-        // Remove BOM e normaliza encoding
         $content = self::normalizeEncoding($content);
 
         return match ($bank) {
@@ -33,12 +32,7 @@ final class CsvImporter
         };
     }
 
-    /**
-     * Rico Cartão de Crédito
-     * Formato: Data;Estabelecimento;Portador;Valor;Parcela
-     * Exemplo: 03/12/2025;MP*MERCADOLIVRE;HENRIQUE HOHN;R$ 73,90;7 de 10
-     * Valores positivos = despesa, negativos = pagamento/crédito
-     */
+    // ── Rico: Data;Estabelecimento;Portador;Valor;Parcela ─────────────────────
     private static function parseRico(string $content): array
     {
         $rows   = self::csvToArray($content, ';');
@@ -47,8 +41,6 @@ final class CsvImporter
 
         foreach ($rows as $row) {
             if ($first) { $first = false; continue; }
-
-            // Garante ao menos 4 colunas
             if (count($row) < 4) continue;
 
             $rawDate  = trim($row[0] ?? '');
@@ -63,12 +55,10 @@ final class CsvImporter
 
             if ($date === null || $cents === null) continue;
 
-            // Enriquece descrição com parcela
             if ($parcela !== '' && $parcela !== '-') {
                 $desc .= " [{$parcela}]";
             }
 
-            // Rico: positivo = compra (despesa), negativo = pagamento (receita)
             $result[] = new ImportedTransaction(
                 date:        $date,
                 description: $desc,
@@ -81,75 +71,121 @@ final class CsvImporter
         return $result;
     }
 
+    // ── Nubank: date,category,title,amount ────────────────────────────────────
     private static function parseNubank(string $content): array
     {
         $rows   = self::csvToArray($content, ',');
         $result = [];
         $first  = true;
+
         foreach ($rows as $row) {
             if ($first) { $first = false; continue; }
             if (count($row) < 4) continue;
+
             $date  = self::parseDate(trim($row[0]));
             $cat   = trim($row[1]);
             $desc  = trim($row[2]);
             $cents = self::parseMoney(trim($row[3]));
+
             if (!$date || $cents === null) continue;
-            $result[] = new ImportedTransaction($date, $desc, abs($cents), $cents > 0 ? 'expense' : 'income', $cat, $row);
+
+            $result[] = new ImportedTransaction(
+                date:             $date,
+                description:      $desc,
+                amountCents:      abs($cents),
+                type:             $cents > 0 ? 'expense' : 'income',
+                originalCategory: $cat,
+                raw:              $row,
+            );
         }
+
         return $result;
     }
 
+    // ── Itaú: Data;Histórico;Docto;Crédito;Débito;Saldo ──────────────────────
     private static function parseItau(string $content): array
     {
         $rows   = self::csvToArray($content, ';');
         $result = [];
         $first  = true;
+
         foreach ($rows as $row) {
             if ($first) { $first = false; continue; }
             if (count($row) < 5) continue;
+
             $date   = self::parseDate(trim($row[0]));
             $desc   = trim($row[1]);
             $credit = self::parseMoney(trim($row[3] ?? ''));
             $debit  = self::parseMoney(trim($row[4] ?? ''));
+
             if (!$date) continue;
-            if ($credit !== null && $credit > 0) $result[] = new ImportedTransaction($date, $desc, $credit, 'income', '', $row);
-            elseif ($debit !== null && $debit > 0) $result[] = new ImportedTransaction($date, $desc, $debit, 'expense', '', $row);
+
+            if ($credit !== null && $credit > 0) {
+                $result[] = new ImportedTransaction($date, $desc, $credit, 'income', '', $row);
+            } elseif ($debit !== null && $debit > 0) {
+                $result[] = new ImportedTransaction($date, $desc, $debit, 'expense', '', $row);
+            }
         }
+
         return $result;
     }
 
+    // ── Bradesco: Data;Histórico;Valor;Saldo ─────────────────────────────────
     private static function parseBradesco(string $content): array
     {
         $rows   = self::csvToArray($content, ';');
         $result = [];
         $first  = true;
+
         foreach ($rows as $row) {
             if ($first) { $first = false; continue; }
             if (count($row) < 3) continue;
+
             $date  = self::parseDate(trim($row[0]));
             $desc  = trim($row[1]);
             $cents = self::parseMoney(trim($row[2]));
+
             if (!$date || $cents === null) continue;
-            $result[] = new ImportedTransaction($date, $desc, abs($cents), $cents < 0 ? 'expense' : 'income', '', $row);
+
+            $result[] = new ImportedTransaction(
+                date:        $date,
+                description: $desc,
+                amountCents: abs($cents),
+                type:        $cents < 0 ? 'expense' : 'income',
+                raw:         $row,
+            );
         }
+
         return $result;
     }
 
+    // ── Genérico ──────────────────────────────────────────────────────────────
     private static function parseGeneric(string $content): array
     {
-        $delim = self::detectDelimiter($content);
-        $rows  = self::csvToArray($content, $delim);
+        $delim  = self::detectDelimiter($content);
+        $rows   = self::csvToArray($content, $delim);
         $result = [];
         $first  = true;
+
         foreach ($rows as $row) {
             if ($first) { $first = false; continue; }
             if (count($row) < 3) continue;
+
             $date  = self::parseDate(trim($row[0]));
             $desc  = trim($row[1]);
             $cents = self::parseMoney(trim($row[2]));
+
             if (!$date || $cents === null) continue;
-            $result[] = new ImportedTransaction($date, $desc, abs($cents), $cents < 0 ? 'expense' : 'income', '', $row);
+
+            $result[] = new ImportedTransaction(
+                date:        $date,
+                description: $desc,
+                amountCents: abs($cents),
+                type:        $cents < 0 ? 'expense' : 'income',
+                raw:         $row,
+            );
         }
+
         return $result;
     }
 
@@ -170,22 +206,39 @@ final class CsvImporter
         return $content;
     }
 
+    /**
+     * Converte CSV em array de linhas.
+     *
+     * Passa o parâmetro $escape explicitamente para evitar
+     * o aviso de depreciação do PHP 8.4 que quebra o ExceptionHandler.
+     */
     private static function csvToArray(string $content, string $delimiter): array
     {
         $lines  = explode("\n", str_replace(["\r\n", "\r"], "\n", $content));
         $result = [];
+
         foreach ($lines as $line) {
             $line = trim($line);
             if ($line === '') continue;
-            $result[] = str_getcsv($line, $delimiter);
+
+            // PHP 8.4: passa $escape = '' explicitamente para evitar depreciação
+            $row = str_getcsv($line, $delimiter, '"', '');
+
+            if (count(array_filter($row, fn($v) => trim($v) !== '')) > 0) {
+                $result[] = $row;
+            }
         }
+
         return $result;
     }
 
     private static function detectDelimiter(string $content): string
     {
         $line   = strtok($content, "\n");
-        $counts = [';' => substr_count($line, ';'), ',' => substr_count($line, ',')];
+        $counts = [
+            ';' => substr_count($line, ';'),
+            ',' => substr_count($line, ','),
+        ];
         arsort($counts);
         return array_key_first($counts);
     }
@@ -205,7 +258,7 @@ final class CsvImporter
 
     /**
      * Converte string monetária para centavos.
-     * Aceita: "R$ 73,90", "1.234,56", "73,90", "-150,00", "100.00"
+     * Aceita: "R$ 73,90", "1.234,56", "73,90", "-150,00"
      */
     private static function parseMoney(string $raw): ?int
     {
@@ -222,19 +275,16 @@ final class CsvImporter
         if (preg_match('/^\d{1,3}(\.\d{3})+,\d{2}$/', $raw)) {
             $raw = str_replace(['.', ','], ['', '.'], $raw);
         }
-        // Formato BR simples: 73,90 ou 1234,56
+        // Formato BR simples: 73,90
         elseif (preg_match('/^\d+,\d{1,2}$/', $raw)) {
             $raw = str_replace(',', '.', $raw);
         }
-        // Formato US: 1234.56
+        // Formato US: 73.90
         elseif (preg_match('/^\d+\.\d{1,2}$/', $raw)) {
             // já está correto
         }
-        // Apenas dígitos
-        elseif (preg_match('/^\d+$/', $raw)) {
-            // inteiro, trata como centavos? Não — trata como reais
-        }
-        else {
+        // Apenas dígitos: 7390
+        elseif (!preg_match('/^\d+$/', $raw)) {
             return null;
         }
 

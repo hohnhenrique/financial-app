@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Core\Validation\Schema;
 use App\Domain\Transaction\TransactionDTO;
 use App\Domain\Transaction\TransactionService;
+use App\Http\Resources\TransactionResource;
+use App\Core\Log\Logger;
 
 final class TransactionController extends ApiController
 {
@@ -22,8 +25,7 @@ final class TransactionController extends ApiController
 
         $userId  = $this->userId();
         $page    = max(1, (int) ($_GET['page']     ?? 1));
-        $perPage = (int) ($_GET['per_page'] ?? 10);
-        $perPage = in_array($perPage, [10, 25, 50, 100]) ? $perPage : 10;
+        $perPage = in_array((int)($_GET['per_page'] ?? 10), [10,25,50,100]) ? (int)$_GET['per_page'] : 10;
 
         $filters = array_filter([
             'type'        => $_GET['type']        ?? '',
@@ -42,7 +44,7 @@ final class TransactionController extends ApiController
         $total = $this->service->countByUser($userId, $filters);
 
         return $this->success([
-            'items'       => array_map(fn($tx) => $this->serialize($tx), $items),
+            'items'       => TransactionResource::collection($items),
             'total'       => $total,
             'page'        => $page,
             'per_page'    => $perPage,
@@ -54,7 +56,8 @@ final class TransactionController extends ApiController
     {
         $this->requireAuth();
         try {
-            return $this->success($this->serialize($this->service->findById((int) $id, $this->userId())));
+            $tx = $this->service->findById((int) $id, $this->userId());
+            return $this->success((new TransactionResource($tx))->toArray());
         } catch (\RuntimeException $e) {
             return $this->error($e->getMessage(), 404);
         }
@@ -64,9 +67,20 @@ final class TransactionController extends ApiController
     {
         $this->requireAuth();
         try {
+            Schema::assert([
+                'type'             => Schema::enum(['income', 'expense'])->required(),
+                'amount'           => Schema::string()->min(1)->required(),
+                'transaction_date' => Schema::date()->required(),
+                'category_id'      => Schema::string()->min(1)->required(),
+                'account_id'       => Schema::string()->min(1)->required(),
+                'description'      => Schema::string()->min(3)->max(255)->required(),
+                'notes'            => Schema::string()->max(1000)->optional(),
+            ], $this->body());
+
             $tx = $this->service->create(TransactionDTO::fromRequest($this->body(), $this->userId()));
-            return $this->success($this->serialize($tx), 'Movimentação cadastrada.', 201);
+            return $this->success((new TransactionResource($tx))->toArray(), 'Movimentação cadastrada.', 201);
         } catch (\InvalidArgumentException $e) {
+            Logger::warning('Transaction validation failed', ['error' => $e->getMessage(), 'user' => $this->userId()]);
             return $this->error($e->getMessage());
         }
     }
@@ -75,9 +89,14 @@ final class TransactionController extends ApiController
     {
         $this->requireAuth();
         try {
-            $tx = $this->service->update((int) $id, $this->userId(), TransactionDTO::fromRequest($this->body(), $this->userId()));
-            return $this->success($this->serialize($tx), 'Movimentação atualizada.');
+            $tx = $this->service->update(
+                (int) $id,
+                $this->userId(),
+                TransactionDTO::fromRequest($this->body(), $this->userId())
+            );
+            return $this->success((new TransactionResource($tx))->toArray(), 'Movimentação atualizada.');
         } catch (\Exception $e) {
+            Logger::warning('Transaction update failed', ['id' => $id, 'error' => $e->getMessage()]);
             return $this->error($e->getMessage());
         }
     }
@@ -93,22 +112,13 @@ final class TransactionController extends ApiController
         }
     }
 
-    private function serialize(\App\Domain\Transaction\Transaction $tx): array
+    public function restore(string $id): string
     {
-        return [
-            'id'               => $tx->id,
-            'user_id'          => $tx->userId,
-            'account_id'       => $tx->accountId,
-            'category_id'      => $tx->categoryId,
-            'type'             => $tx->type,
-            'amount_cents'     => $tx->amountCents,
-            'description'      => $tx->description,
-            'notes'            => $tx->notes,
-            'transaction_date' => $tx->transactionDate,
-            'category_name'    => $tx->categoryName,
-            'category_color'   => $tx->categoryColor ?? null,
-            'account_name'     => $tx->accountName,
-            'created_at'       => $tx->createdAt,
-        ];
+        $this->requireAuth();
+        $this->query(
+            'UPDATE transactions SET deleted_at = NULL WHERE id = ? AND user_id = ?',
+            [$id, $this->userId()]
+        );
+        return $this->success(null, 'Movimentação restaurada.');
     }
 }

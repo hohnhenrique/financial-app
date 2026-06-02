@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { Alert } from '@/components/ui/Alert'
+import { useToast } from '@/context/ToastContext'
 import { Pagination } from '@/components/ui/Pagination'
 import { SortHeader } from '@/components/ui/SortHeader'
 import { MoneyValue } from '@/components/ui/MoneyValue'
@@ -20,14 +20,13 @@ const EMPTY: AccountPayload = { name: '', type: 'checking', initial_balance: '0,
 
 export function AccountsPage() {
   const qc = useQueryClient()
+  const toast = useToast();
   const [page, setPage]       = useState(1)
   const [perPage, setPerPage] = useState(10)
   const [sortBy, setSortBy]   = useState('created_at')
   const [sortDir, setSortDir] = useState<'ASC'|'DESC'>('DESC')
   const [form, setForm]       = useState<AccountPayload>(EMPTY)
   const [editing, setEditing] = useState<Account | null>(null)
-  const [error, setError]     = useState('')
-  const [success, setSuccess] = useState('')
 
   const { data } = useQuery({
     queryKey: ['accounts', page, perPage, sortBy, sortDir],
@@ -39,8 +38,25 @@ export function AccountsPage() {
     qc.invalidateQueries({ queryKey: ['accounts'] })
     qc.invalidateQueries({ queryKey: ['accounts-all'] })
   }
-  const createMut  = useMutation({ mutationFn: accountsApi.create, onSuccess: () => { invalidate(); setForm(EMPTY); setSuccess('Conta cadastrada!') } })
-  const updateMut  = useMutation({ mutationFn: ({ id, data }: { id: string; data: AccountPayload }) => accountsApi.update(id, data), onSuccess: () => { invalidate(); setEditing(null); setForm(EMPTY); setSuccess('Conta atualizada!') } })
+
+  const createMut = useMutation({
+    mutationFn: accountsApi.create,
+    onSuccess:  () => { invalidate(); setForm(EMPTY); toast.success('Conta cadastrada!') },
+    onError:    (e: unknown) => {
+      const msg = (e as {response?: {data?: {message?: string}}})?.response?.data?.message
+      toast.error(msg ?? 'Erro ao salvar conta.')
+    },
+  })
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: AccountPayload }) => accountsApi.update(id, data),
+    onSuccess:  () => { invalidate(); setEditing(null); setForm(EMPTY); toast.success('Conta atualizada!') },
+    onError:    (e: unknown) => {
+      const msg = (e as {response?: {data?: {message?: string}}})?.response?.data?.message
+      toast.error(msg ?? 'Erro ao salvar conta.')
+    },
+  })
+
   const deleteMut  = useMutation({ mutationFn: accountsApi.delete, onSuccess: invalidate })
 
   const openEdit = (a: Account) => {
@@ -49,12 +65,10 @@ export function AccountsPage() {
   }
 
   const handleSubmit = async () => {
-    setError(''); setSuccess('')
     try {
       if (editing) await updateMut.mutateAsync({ id: String(editing.id), data: form })
       else await createMut.mutateAsync(form)
     } catch (e: unknown) {
-      setError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Erro ao salvar.')
     }
   }
 
@@ -64,8 +78,6 @@ export function AccountsPage() {
     <div className="grid grid-cols-1 xl:grid-cols-[380px_1fr] gap-6">
       <Card title={editing ? 'Editar Conta' : 'Nova Conta'} subtitle="Cadastre bancos, carteiras e cartões.">
         <div className="px-6 pt-5 pb-6 space-y-5">
-        {error   && <Alert type="error"   message={error} />}
-          {success && <Alert type="success" message={success} />}
           <Input label="Nome" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: Nubank, Carteira" required />
           <Select label="Tipo" options={TYPES} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} required />
           <Input label="Saldo inicial" prefix="R$" value={form.initial_balance ?? ''} onChange={e => setForm(f => ({ ...f, initial_balance: e.target.value }))} placeholder="0,00" />

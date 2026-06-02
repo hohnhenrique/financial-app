@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Core\Database\Connection;
 use App\Core\Middleware\CsrfMiddleware;
+use App\Core\Validation\Schema;
 
 final class AuthController extends ApiController
 {
@@ -15,9 +16,10 @@ final class AuthController extends ApiController
         $email    = trim($body['email']    ?? '');
         $password = trim($body['password'] ?? '');
 
-        if (!$email || !$password) {
-            return $this->error('E-mail e senha são obrigatórios.');
-        }
+        Schema::assert([
+            'email'    => Schema::email()->required(),
+            'password' => Schema::string()->min(1)->required(),
+        ], $body);
 
         $pdo  = Connection::get();
         $stmt = $pdo->prepare('SELECT * FROM users WHERE email = ? AND deleted_at IS NULL');
@@ -55,9 +57,11 @@ final class AuthController extends ApiController
         $email    = trim($body['email']    ?? '');
         $password = trim($body['password'] ?? '');
 
-        if (!$name || !$email || !$password) return $this->error('Preencha todos os campos.');
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return $this->error('E-mail inválido.');
-        if (strlen($password) < 8) return $this->error('Senha deve ter no mínimo 8 caracteres.');
+        Schema::assert([
+            'name'     => Schema::string()->min(2)->max(255)->required(),
+            'email'    => Schema::email()->required(),
+            'password' => Schema::string()->min(8)->max(72)->required(),
+        ], $body);
 
         $pdo = Connection::get();
 

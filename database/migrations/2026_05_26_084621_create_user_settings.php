@@ -15,6 +15,6 @@ return new class {
         ");
     }
     public function down(PDO $pdo): void {
-        $pdo->exec("DROP TABLE IF EXISTS user_settings;");
+        $pdo->exec("DROP TABLE IF EXISTS monthly_goals CASCADE");
     }
 };

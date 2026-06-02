@@ -10,43 +10,54 @@ use App\Core\ExceptionHandler;
 use App\Core\Middleware\CsrfMiddleware;
 use App\Core\Middleware\RateLimitMiddleware;
 use App\Core\Request;
-use App\Core\View\Component;
 use App\Infrastructure\Session\RedisSession;
 
-// 1. Carrega env
-Env::load(dirname(__DIR__) . '/.env');
-
-// 2. Registra handler global de exceções (antes de tudo)
+// ── 1. Registra handler de exceções ANTES de tudo ─────────────────────────────
 ExceptionHandler::register();
 
-// 3. Inicia sessão
-$session = new RedisSession();
-$session->start();
+// ── 2. Carrega e valida o .env ────────────────────────────────────────────────
+Env::load(dirname(__DIR__) . '/.env');
 
-// 4. Rate limiting (por IP e por usuário)
-RateLimitMiddleware::handle();
+Env::require('DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS', 'REDIS_HOST');
 
-// 5. CSRF (apenas em mutações)
-$request = new Request();
-CsrfMiddleware::handle($request->method);
+Env::validate([
+    'DB_PORT'    => ['type' => 'int',  'required' => false],
+    'REDIS_PORT' => ['type' => 'int',  'required' => false],
+    'APP_DEBUG'  => ['type' => 'bool', 'required' => false],
+]);
 
-// 6. Container DI
-Component::setBasePath(dirname(__DIR__) . '/src/Views');
-$container = new Container();
-$container->singleton(RedisSession::class, fn() => $session);
-require dirname(__DIR__) . '/config/bindings.php';
-
-// 7. CORS
+// ── 3. CORS ───────────────────────────────────────────────────────────────────
 $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
-$allowed = ['http://localhost:5173', 'http://localhost:3000'];
+$allowed = array_filter(explode(',', Env::get('CORS_ORIGINS', 'http://localhost:5173,http://localhost:3000')));
+
 if (in_array($origin, $allowed, true)) {
     header("Access-Control-Allow-Origin: {$origin}");
     header('Access-Control-Allow-Credentials: true');
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type, Accept, X-Requested-With, X-CSRF-Token');
 }
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
-// 8. Dispatch
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
+// ── 4. Sessão ─────────────────────────────────────────────────────────────────
+$session = new RedisSession();
+$session->start();
+
+// ── 5. Rate limiting ──────────────────────────────────────────────────────────
+RateLimitMiddleware::handle();
+
+// ── 6. CSRF ───────────────────────────────────────────────────────────────────
+$request = new Request();
+CsrfMiddleware::handle($request->method);
+
+// ── 7. Container DI ───────────────────────────────────────────────────────────
+$container = new Container();
+$container->instance(RedisSession::class, $session);
+require dirname(__DIR__) . '/config/bindings.php';
+
+// ── 8. Dispatch ───────────────────────────────────────────────────────────────
 $router = require dirname(__DIR__) . '/config/routes.php';
 $router->dispatch($request, $container);

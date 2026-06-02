@@ -4,53 +4,95 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Repository;
 
-use App\Core\Database\Connection;
-use PDO;
-use PDOStatement;
+use App\Core\Log\Logger;
 
 abstract class AbstractRepository
 {
-    protected PDO $pdo;
+    public function __construct(
+        protected readonly \PDO $pdo,
+    ) {}
 
-    public function __construct()
+    // ── Execução ──────────────────────────────────────────────────────────────
+
+    protected function query(string $sql, array $bindings = []): \PDOStatement
     {
-        $this->pdo = Connection::get();
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($bindings);
+            return $stmt;
+        } catch (\PDOException $e) {
+            Logger::error('Query falhou', [
+                'sql'      => $this->normalizeSql($sql),
+                'bindings' => $this->sanitizeBindings($bindings),
+                'error'    => $e->getMessage(),
+                'code'     => $e->getCode(),
+            ]);
+            throw $e;
+        }
     }
 
-    protected function query(string $sql, array $bindings = []): PDOStatement
+    // ── Fetch helpers ─────────────────────────────────────────────────────────
+
+    /** Retorna todos os registros como array associativo */
+    protected function fetchAll(string $sql, array $bindings = []): array
     {
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($bindings);
-        return $stmt;
+        return $this->query($sql, $bindings)->fetchAll(\PDO::FETCH_ASSOC);
     }
 
+    /** Retorna o primeiro registro ou null */
     protected function fetchOne(string $sql, array $bindings = []): ?array
     {
-        $row = $this->query($sql, $bindings)->fetch();
+        $row = $this->query($sql, $bindings)->fetch(\PDO::FETCH_ASSOC);
         return $row ?: null;
     }
 
-    /** @return array[] */
-    protected function fetchAll(string $sql, array $bindings = []): array
-    {
-        return $this->query($sql, $bindings)->fetchAll();
-    }
-
-    protected function insertReturningId(string $sql, array $bindings = []): int|string
+    /** Retorna um único valor escalar */
+    protected function fetchScalar(string $sql, array $bindings = []): mixed
     {
         return $this->query($sql, $bindings)->fetchColumn();
     }
 
-    protected function count(string $table, string $where = '', array $bindings = []): int
+    /** Insert com RETURNING id */
+    protected function insertReturningId(string $sql, array $bindings = []): string|int
     {
-        $sql = "SELECT COUNT(*) FROM {$table}" . ($where ? " WHERE {$where}" : '');
-        return (int) $this->query($sql, $bindings)->fetchColumn();
+        return $this->query($sql, $bindings)->fetchColumn();
     }
 
-    protected function paginate(string $sql, array $bindings, int $page, int $perPage): array
+    // ── QueryBuilder fluente ──────────────────────────────────────────────────
+
+    protected function table(string $table): QueryBuilder
     {
-        $offset  = ($page - 1) * $perPage;
-        $paged   = $sql . " LIMIT {$perPage} OFFSET {$offset}";
-        return $this->fetchAll($paged, $bindings);
+        return new QueryBuilder($this->pdo, $table);
+    }
+
+    // ── Transações ────────────────────────────────────────────────────────────
+
+    protected function transaction(callable $callback): mixed
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $result = $callback();
+            $this->pdo->commit();
+            return $result;
+        } catch (\Throwable $e) {
+            $this->pdo->rollBack();
+            Logger::error('Transação revertida', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    // ── Utilitários ───────────────────────────────────────────────────────────
+
+    private function normalizeSql(string $sql): string
+    {
+        return preg_replace('/\s+/', ' ', trim($sql));
+    }
+
+    private function sanitizeBindings(array $bindings): array
+    {
+        return array_map(function ($v) {
+            if (is_string($v) && strlen($v) > 100) return substr($v, 0, 100) . '...';
+            return $v;
+        }, $bindings);
     }
 }

@@ -16,5 +16,6 @@ final class TransactionRoutes
         $router->get('/api/transactions/{id}',    [TransactionController::class, 'show']);
         $router->put('/api/transactions/{id}',    [TransactionController::class, 'update']);
         $router->delete('/api/transactions/{id}', [TransactionController::class, 'delete']);
+        $router->post('/api/transactions/{id}/restore', [TransactionController::class, 'restore']);
     }
 }

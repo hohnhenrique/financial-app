@@ -20,6 +20,6 @@ return new class {
         ");
     }
     public function down(PDO $pdo): void {
-        $pdo->exec("DROP TABLE IF EXISTS users;");
+        $pdo->exec("DROP TABLE IF EXISTS users CASCADE");
     }
 };

@@ -6,16 +6,6 @@ namespace App\Domain\Import\BankParser;
 
 use App\Domain\Import\ImportedTransaction;
 
-/**
- * Formato Inter:
- * Extrato conta corrente: CSV com separador ; e cabeçalho
- * Data;Tipo;Descrição;Valor
- * 15/05/2025;Pix Enviado;PAGAMENTO ENERGIA;-150,00
- * 20/05/2025;Pix Recebido;SALÁRIO;3500,00
- *
- * Extrato cartão: OFX ou CSV
- * Data;Histórico;Valor
- */
 final class InterParser
 {
     /** @return ImportedTransaction[] */
@@ -29,12 +19,7 @@ final class InterParser
         foreach ($rows as $row) {
             if (!$started) {
                 $cols = array_map(fn($c) => mb_strtolower(trim($c)), $row);
-                // Detecta linha de cabeçalho
-                if (
-                    in_array('data', $cols) ||
-                    in_array('dt. movimento', $cols) ||
-                    in_array('datamovimento', $cols)
-                ) {
+                if (in_array('data', $cols) || in_array('dt. movimento', $cols)) {
                     $started = true;
                 }
                 continue;
@@ -42,16 +27,9 @@ final class InterParser
 
             if (count($row) < 3) continue;
 
-            // Tenta mapear colunas
             $rawDate  = trim($row[0] ?? '');
-            $desc     = trim($row[2] ?? $row[1] ?? '');
-            $rawValue = trim($row[3] ?? $row[2] ?? '');
-
-            // Se 4 colunas: Data | Tipo | Descrição | Valor
-            if (count($row) >= 4) {
-                $desc     = trim($row[2]);
-                $rawValue = trim($row[3]);
-            }
+            $desc     = count($row) >= 4 ? trim($row[2]) : trim($row[1]);
+            $rawValue = count($row) >= 4 ? trim($row[3]) : trim($row[2]);
 
             $date  = self::parseDate($rawDate);
             $cents = self::parseMoney($rawValue);
@@ -72,20 +50,34 @@ final class InterParser
 
     private static function normalizeEncoding(string $content): string
     {
+        if (str_starts_with($content, "\xEF\xBB\xBF")) {
+            $content = substr($content, 3);
+        }
         $enc = mb_detect_encoding($content, ['UTF-8', 'ISO-8859-1', 'Windows-1252'], true);
         if ($enc && $enc !== 'UTF-8') {
             $content = mb_convert_encoding($content, 'UTF-8', $enc);
         }
-        return ltrim($content, "\xEF\xBB\xBF");
+        return $content;
     }
 
     private static function toRows(string $content, string $delimiter): array
     {
-        $lines = explode("\n", str_replace(["\r\n", "\r"], "\n", $content));
-        return array_filter(
-            array_map(fn($l) => str_getcsv(trim($l), $delimiter), $lines),
-            fn($r) => count(array_filter($r)) > 0
-        );
+        $lines  = explode("\n", str_replace(["\r\n", "\r"], "\n", $content));
+        $result = [];
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') continue;
+
+            // PHP 8.4: $escape explícito
+            $row = str_getcsv($line, $delimiter, '"', '');
+
+            if (count(array_filter($row, fn($v) => trim($v) !== '')) > 0) {
+                $result[] = $row;
+            }
+        }
+
+        return $result;
     }
 
     private static function parseDate(string $raw): ?string
@@ -101,13 +93,13 @@ final class InterParser
 
     private static function parseMoney(string $raw): ?int
     {
-        $raw = trim(preg_replace('/[R$\s]/', '', $raw));
+        $raw = trim(preg_replace('/[^\d.,\-]/', '', $raw));
         if ($raw === '' || $raw === '-') return null;
 
-        $negative = str_starts_with($raw, '-');
+        $neg = str_starts_with($raw, '-');
         $raw = ltrim($raw, '-+');
 
-        if (preg_match('/^\d{1,3}(\.\d{3})*,\d{2}$/', $raw)) {
+        if (preg_match('/^\d{1,3}(\.\d{3})+,\d{2}$/', $raw)) {
             $raw = str_replace(['.', ','], ['', '.'], $raw);
         } elseif (preg_match('/^\d+,\d{1,2}$/', $raw)) {
             $raw = str_replace(',', '.', $raw);
@@ -116,6 +108,6 @@ final class InterParser
         }
 
         $cents = (int) round((float) $raw * 100);
-        return $negative ? -$cents : $cents;
+        return $neg ? -$cents : $cents;
     }
 }

@@ -15,6 +15,11 @@ services:
       dockerfile: docker/php/Dockerfile
     volumes:
       - ./:/var/www/html
+      - ./storage:/var/www/html/storage
+    command:
+      - sh -c "mkdir -p /var/www/html/storage/logs &&
+      - chmod -R 777 /var/www/html/storage &&
+      - php-fpm"
     depends_on:
       postgres:
         condition: service_healthy

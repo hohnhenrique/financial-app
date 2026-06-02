@@ -4,6 +4,7 @@ import { accountsApi } from '@/api/accounts'
 import { categoriesApi } from '@/api/categories'
 import { importApi, type ImportedRow } from '@/api/import'
 import { Card } from '@/components/ui/Card'
+import { useToast } from '@/context/ToastContext'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { Alert } from '@/components/ui/Alert'
@@ -31,6 +32,8 @@ type Step = 'upload' | 'review' | 'done'
 
 export function ImportPage() {
   const fileRef = useRef<HTMLInputElement>(null)
+  const toast = useToast()
+
   const [step, setStep]               = useState<Step>('upload')
   const [bank, setBank]               = useState('rico')
   const [defaultAccountId, setDefaultAccountId] = useState('')
@@ -78,8 +81,8 @@ export function ImportPage() {
       })))
       setStep('review')
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setError(msg ?? 'Erro ao processar o arquivo.')
+      const msg = (e as {response?: {data?: {message?: string}}})?.response?.data?.message
+      toast.error(msg ?? 'Erro ao processar o arquivo.')
     } finally {
       setLoading(false)
     }
@@ -98,8 +101,8 @@ export function ImportPage() {
       setResult(res.data.data)
       setStep('done')
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setError(msg ?? 'Erro ao importar.')
+      const msg = (e as {response?: {data?: {message?: string}}})?.response?.data?.message
+      toast.error(msg ?? 'Erro ao processar o arquivo.')
     } finally {
       setLoading(false)
     }

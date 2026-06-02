@@ -25,11 +25,29 @@ export function ReportsPage() {
   const [filters, setFilters]       = useState<ReportFilters>({})
   const [enabled, setEnabled]       = useState(false)
 
-  const { data: allAccounts }   = useQuery({ queryKey: ['accounts-all'],   queryFn: () => accountsApi.listAll().then(r => r.data.data.items) })
-  const { data: allCategories } = useQuery({ queryKey: ['categories-all'], queryFn: () => categoriesApi.list().then(r => r.data.data) })
+  const { data: accountsData } = useQuery({
+    queryKey:       ['accounts-all'],
+    queryFn:        () => accountsApi.listAll().then(r => r.data.data),
+    staleTime:      0,
+    refetchOnMount: true,
+  })
 
-  const catOptions = (allCategories ?? []).map(c => ({ value: String(c.id), label: c.name }))
-  const accOptions = (allAccounts   ?? []).map(a => ({ value: String(a.id), label: a.name }))
+  const { data: categories } = useQuery({
+    queryKey:       ['categories-all'],
+    queryFn:        () => categoriesApi.list().then(r => r.data.data),
+    staleTime:      0,
+    refetchOnMount: true,
+  })
+
+  const allAccounts = accountsData?.items ?? []
+  const allCategories = categories ?? []
+
+  const catOptions = allCategories
+      .filter(c => !c.is_archived)
+      .map(c => ({ value: String(c.id), label: c.name }))
+
+  const accOptions = allAccounts
+      .map(a => ({ value: String(a.id), label: a.name }))
 
   const { data: report, isLoading, isFetching } = useQuery({
     queryKey: ['report', reportType, filters],

@@ -27,6 +27,6 @@ return new class {
         ");
     }
     public function down(PDO $pdo): void {
-        $pdo->exec("DROP TABLE IF EXISTS transactions;");
+        $pdo->exec("DROP TABLE IF EXISTS transactions CASCADE");
     }
 };

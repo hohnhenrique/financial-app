@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Alert } from '@/components/ui/Alert'
 import { Pagination } from '@/components/ui/Pagination'
+import { useToast } from '@/context/ToastContext'
 import { SortHeader } from '@/components/ui/SortHeader'
 import { useAuth } from '@/context/AuthContext'
 import { Navigate } from 'react-router-dom'
@@ -27,13 +27,18 @@ interface AdminUser {
 export function AdminUsersPage() {
   const { user }  = useAuth()
   const qc        = useQueryClient()
+  const toast = useToast()
 
   const [page, setPage]       = useState(1)
   const [perPage, setPerPage] = useState(10)
   const [sortBy, setSortBy]   = useState('created_at')
   const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('DESC')
-  const [msg, setMsg]         = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  const toggleMut = useMutation({
+    mutationFn: adminApi.toggleRole,
+    onSuccess:  () => { invalidate(); toast.success('Perfil atualizado.') },
+    onError:    () => toast.error('Erro ao atualizar perfil.'),
+  })
   if (user?.role !== 'admin') return <Navigate to="/" replace />
 
   const { data: all } = useQuery({
@@ -65,16 +70,10 @@ export function AdminUsersPage() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['admin-users'] })
 
-  const toggleMut = useMutation({
-    mutationFn: adminApi.toggleRole,
-    onSuccess:  () => { invalidate(); setMsg({ type: 'success', text: 'Perfil atualizado.' }) },
-    onError:    () => setMsg({ type: 'error', text: 'Erro ao atualizar perfil.' }),
-  })
-
   const deleteMut = useMutation({
     mutationFn: adminApi.delete,
-    onSuccess:  () => { invalidate(); setMsg({ type: 'success', text: 'Usuário removido.' }) },
-    onError:    () => setMsg({ type: 'error', text: 'Erro ao remover.' }),
+    onSuccess:  () => { invalidate(); toast.success('Usuário removido.') },
+    onError:    () => toast.error('Erro ao remover usuário.'),
   })
 
   const handleSort = (field: string, dir: 'ASC' | 'DESC') => {
@@ -83,11 +82,6 @@ export function AdminUsersPage() {
 
   return (
     <Card title={`Usuários do Sistema ${total ? `(${total})` : ''}`} subtitle="Visível apenas para administradores.">
-      {msg && (
-        <div className="px-6 pt-5">
-          <Alert type={msg.type} message={msg.text} />
-        </div>
-      )}
 
       {paged.length === 0
         ? <div className="px-6 py-16 text-center text-slate-400 dark:text-slate-500 text-sm">

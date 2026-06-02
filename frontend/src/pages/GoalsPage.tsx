@@ -4,11 +4,12 @@ import { goalsApi } from '@/api/goals'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Alert } from '@/components/ui/Alert'
+import { useToast } from '@/context/ToastContext'
 import { Pagination } from '@/components/ui/Pagination'
 import { SortHeader } from '@/components/ui/SortHeader'
 import { MoneyValue } from '@/components/ui/MoneyValue'
 import { formatMoney } from '@/utils/format'
+import {Alert} from "@/components/ui/Alert.tsx";
 
 const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
@@ -45,6 +46,7 @@ function ProgressBar({ value, max, color }: { value: number; max: number; color:
 
 export function GoalsPage() {
   const qc = useQueryClient()
+  const toast = useToast()
 
   // Paginação e ordenação
   const [page, setPage]       = useState(1)
@@ -57,8 +59,7 @@ export function GoalsPage() {
   const [incomeGoal,  setIncomeGoal]      = useState('')
   const [expenseGoal, setExpenseGoal]     = useState('')
   const [notes, setNotes]                 = useState('')
-  const [error, setError]                 = useState('')
-  const [success, setSuccess]             = useState('')
+
 
   const { data: status, isLoading } = useQuery({
     queryKey: ['goal-status', selectedMonth],
@@ -87,19 +88,13 @@ export function GoalsPage() {
   const paged      = sorted.slice((page - 1) * perPage, page * perPage)
 
   const saveMut = useMutation({
-    mutationFn: () => goalsApi.upsert({
-      year_month:   selectedMonth,
-      income_goal:  incomeGoal  || '0',
-      expense_goal: expenseGoal || '0',
-      notes,
-    }),
-    onSuccess: () => {
-      setSuccess('Meta salva com sucesso!')
-      setError('')
+    mutationFn: () => goalsApi.upsert({ year_month: selectedMonth, income_goal: incomeGoal || '0', expense_goal: expenseGoal || '0', notes }),
+    onSuccess:  () => {
       qc.invalidateQueries({ queryKey: ['goal-status', selectedMonth] })
       qc.invalidateQueries({ queryKey: ['goals'] })
+      toast.success('Meta salva com sucesso!')
     },
-    onError: () => setError('Erro ao salvar a meta.'),
+    onError: () => toast.error('Erro ao salvar a meta.'),
   })
 
   const deleteMut = useMutation({
@@ -119,8 +114,6 @@ export function GoalsPage() {
     setIncomeGoal('')
     setExpenseGoal('')
     setNotes('')
-    setError('')
-    setSuccess('')
   }
 
   const monthOptions = Array.from({ length: 15 }, (_, i) => {
@@ -147,8 +140,6 @@ export function GoalsPage() {
       <div className="space-y-5">
         <Card title="Meta Mensal" subtitle="Defina sua meta de receita e despesa." padding>
           <div className="space-y-5">
-            {error   && <Alert type="error"   message={error}   />}
-            {success && <Alert type="success" message={success} />}
 
             <div>
               <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">Mês *</label>

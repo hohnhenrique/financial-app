@@ -4,7 +4,7 @@ import axios from 'axios'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Alert } from '@/components/ui/Alert'
+import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/context/AuthContext'
 
 const profileApi = {
@@ -16,10 +16,10 @@ const profileApi = {
 
 export function ProfilePage() {
   const { user } = useAuth()
+  const toast = useToast()
+
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [pwdMsg, setPwdMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [current, setCurrent] = useState('')
   const [newPwd, setNewPwd] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -30,21 +30,29 @@ export function ProfilePage() {
 
   const updateMut = useMutation({
     mutationFn: () => profileApi.update({ name, email }),
-    onSuccess: () => setProfileMsg({ type: 'success', text: 'Dados atualizados com sucesso.' }),
-    onError: (e: unknown) => setProfileMsg({ type: 'error', text: (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Erro.' }),
+    onSuccess:  () => toast.success('Dados atualizados com sucesso.'),
+    onError:    (e: unknown) => {
+      const msg = (e as {response?: {data?: {message?: string}}})?.response?.data?.message
+      toast.error(msg ?? 'Erro ao atualizar dados.')
+    },
   })
 
   const pwdMut = useMutation({
     mutationFn: () => profileApi.updatePassword({ current_password: current, new_password: newPwd, confirm_password: confirm }),
-    onSuccess: () => { setPwdMsg({ type: 'success', text: 'Senha alterada com sucesso.' }); setCurrent(''); setNewPwd(''); setConfirm('') },
-    onError: (e: unknown) => setPwdMsg({ type: 'error', text: (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Erro.' }),
+    onSuccess:  () => {
+      toast.success('Senha alterada com sucesso.')
+      setCurrent(''); setNewPwd(''); setConfirm('')
+    },
+    onError: (e: unknown) => {
+      const msg = (e as {response?: {data?: {message?: string}}})?.response?.data?.message
+      toast.error(msg ?? 'Erro ao alterar senha.')
+    },
   })
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <Card title="Dados Pessoais" subtitle="Atualize seu nome e e-mail de acesso.">
         <div className="px-8 py-6 space-y-5">
-          {profileMsg && <Alert type={profileMsg.type} message={profileMsg.text} />}
           <Input label="Nome" value={name} onChange={e => setName(e.target.value)} required />
           <Input label="E-mail" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
           <div>
@@ -65,7 +73,6 @@ export function ProfilePage() {
 
       <Card title="Alterar Senha" subtitle="Mínimo de 8 caracteres.">
         <div className="px-8 py-6 space-y-5">
-          {pwdMsg && <Alert type={pwdMsg.type} message={pwdMsg.text} />}
           <Input label="Senha atual" type="password" value={current} onChange={e => setCurrent(e.target.value)} placeholder="••••••••" required />
           <Input label="Nova senha" type="password" value={newPwd} onChange={e => setNewPwd(e.target.value)} placeholder="Mínimo 8 caracteres" required />
           <Input label="Confirmar nova senha" type="password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repita a nova senha" required />

@@ -10,165 +10,210 @@ Env::load(dirname(__DIR__) . '/.env');
 
 $pdo = new PDO(
     sprintf('pgsql:host=%s;port=%s;dbname=%s',
-        $_ENV['DB_HOST'], $_ENV['DB_PORT'], $_ENV['DB_NAME']),
-    $_ENV['DB_USER'],
-    $_ENV['DB_PASS'],
-    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
+        $_ENV['DB_HOST'], $_ENV['DB_PORT'] ?? 5432, $_ENV['DB_NAME']),
+    $_ENV['DB_USER'], $_ENV['DB_PASS'],
+    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
 );
 
-// Garante que a tabela de controle existe
+// Tabela de controle com checksum
 $pdo->exec("
     CREATE TABLE IF NOT EXISTS migrations (
-        id         SERIAL PRIMARY KEY,
-        filename   VARCHAR(255) NOT NULL UNIQUE,
-        ran_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+        id          SERIAL PRIMARY KEY,
+        version     VARCHAR(255) NOT NULL UNIQUE,
+        checksum    CHAR(32)     NOT NULL,
+        applied_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
     )
 ");
 
-$command = $argv[1] ?? 'up';
-$steps   = isset($argv[2]) ? (int) $argv[2] : 1;
+$migrationsPath = dirname(__DIR__) . '/database/migrations';
+$command        = $argv[1] ?? 'status';
 
-$allFiles = glob(dirname(__DIR__) . '/database/migrations/*.php');
-sort($allFiles);
+// ── Funções auxiliares ────────────────────────────────────────────────────────
 
-$ran = $pdo->query("SELECT filename FROM migrations ORDER BY id")
-           ->fetchAll(PDO::FETCH_COLUMN);
-
-// ── UP ────────────────────────────────────────────────────────────────────────
-if ($command === 'up') {
-    $pending = array_filter($allFiles, fn($f) => !in_array(basename($f), $ran));
-
-    if (empty($pending)) {
-        echo "\n  Nenhuma migration pendente. Banco está atualizado. ✅\n\n";
-        exit(0);
-    }
-
-    echo "\n  Rodando migrations...\n\n";
-
-    foreach ($pending as $file) {
-        $name = basename($file);
-        try {
-            $pdo->beginTransaction();
-            $migration = require $file;
-            $migration->up($pdo);
-            $pdo->prepare("INSERT INTO migrations (filename) VALUES (?)")->execute([$name]);
-            $pdo->commit();
-            echo "  ✅  {$name}\n";
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
-            echo "  ❌  {$name} - ERRO: {$e->getMessage()}\n";
-            exit(1);
-        }
-    }
-
-    echo "\n  Migrations concluídas com sucesso! ✅\n\n";
+function getMigrationFiles(string $path): array
+{
+    $files = glob($path . '/*.php');
+    sort($files);
+    return $files;
 }
 
-// ── ROLLBACK ──────────────────────────────────────────────────────────────────
-elseif ($command === 'rollback') {
-    $toRollback = $pdo->query("
-        SELECT filename FROM migrations ORDER BY id DESC LIMIT {$steps}
-    ")->fetchAll(PDO::FETCH_COLUMN);
+function getApplied(PDO $pdo): array
+{
+    return $pdo->query("SELECT version, checksum FROM migrations ORDER BY version")
+               ->fetchAll(PDO::FETCH_KEY_PAIR);
+}
 
-    if (empty($toRollback)) {
-        echo "\n  Nenhuma migration para reverter.\n\n";
-        exit(0);
-    }
+function fileChecksum(string $file): string
+{
+    return md5_file($file);
+}
 
-    echo "\n  Revertendo {$steps} migration(s)...\n\n";
+function loadMigration(string $file): object
+{
+    return require $file;
+}
 
-    foreach ($toRollback as $name) {
-        $file = dirname(__DIR__) . '/database/migrations/' . $name;
+function colorize(string $text, string $color): string
+{
+    $colors = ['green' => "\033[32m", 'red' => "\033[31m", 'yellow' => "\033[33m", 'reset' => "\033[0m"];
+    return ($colors[$color] ?? '') . $text . $colors['reset'];
+}
 
-        if (!file_exists($file)) {
-            echo "  ⚠️   {$name} - arquivo não encontrado, pulando.\n";
+// ── Comandos ──────────────────────────────────────────────────────────────────
+
+match ($command) {
+    'up'       => runUp($pdo, $migrationsPath, (int)($argv[2] ?? PHP_INT_MAX)),
+    'down'     => runDown($pdo, $migrationsPath, (int)($argv[2] ?? 1)),
+    'rollback' => runDown($pdo, $migrationsPath, (int)($argv[2] ?? 1)),
+    'reset'    => runReset($pdo, $migrationsPath),
+    'status'   => runStatus($pdo, $migrationsPath),
+    'fresh'    => runFresh($pdo, $migrationsPath),
+    default    => showHelp(),
+};
+
+// ── UP ────────────────────────────────────────────────────────────────────────
+function runUp(PDO $pdo, string $path, int $steps): void
+{
+    $files   = getMigrationFiles($path);
+    $applied = getApplied($pdo);
+    $ran     = 0;
+
+    foreach ($files as $file) {
+        if ($ran >= $steps) break;
+
+        $version  = basename($file, '.php');
+        $checksum = fileChecksum($file);
+
+        // Detecta migration modificada após aplicada
+        if (isset($applied[$version])) {
+            if ($applied[$version] !== $checksum) {
+                echo colorize("⚠ AVISO: {$version} foi modificada após ser aplicada! Checksum diverge.", 'yellow') . "\n";
+                echo "   Esperado: {$applied[$version]}\n";
+                echo "   Atual:    {$checksum}\n";
+            }
             continue;
         }
 
+        echo "Aplicando {$version}... ";
+
         try {
+            $migration = loadMigration($file);
             $pdo->beginTransaction();
-            $migration = require $file;
-            $migration->down($pdo);
-            $pdo->prepare("DELETE FROM migrations WHERE filename = ?")->execute([$name]);
+            $migration->up($pdo);
+
+            $stmt = $pdo->prepare("INSERT INTO migrations (version, checksum) VALUES (?, ?)");
+            $stmt->execute([$version, $checksum]);
             $pdo->commit();
-            echo "  ↩️   {$name}\n";
+
+            echo colorize("✓", 'green') . "\n";
+            $ran++;
         } catch (\Throwable $e) {
             $pdo->rollBack();
-            echo "  ❌  {$name} - ERRO: {$e->getMessage()}\n";
+            echo colorize("✗ ERRO: " . $e->getMessage(), 'red') . "\n";
             exit(1);
         }
     }
 
-    echo "\n  Rollback concluído! ↩️\n\n";
+    if ($ran === 0) echo colorize("Nenhuma migration pendente.", 'green') . "\n";
+    else echo colorize("{$ran} migration(s) aplicada(s).", 'green') . "\n";
 }
 
-// ── STATUS ────────────────────────────────────────────────────────────────────
-elseif ($command === 'status') {
-    echo "\n  Status das migrations:\n\n";
-    echo "  " . str_pad("Arquivo", 45) . str_pad("Status", 12) . "Executada em\n";
-    echo "  " . str_repeat("─", 75) . "\n";
+// ── DOWN ──────────────────────────────────────────────────────────────────────
+function runDown(PDO $pdo, string $path, int $steps): void
+{
+    $applied = array_keys(getApplied($pdo));
+    $toRun   = array_reverse(array_slice(array_reverse($applied), 0, $steps));
+    $files   = array_combine(
+        array_map(fn($f) => basename($f, '.php'), getMigrationFiles($path)),
+        getMigrationFiles($path)
+    );
 
-    foreach ($allFiles as $file) {
-        $name = basename($file);
-        $done = array_search($name, $ran);
+    foreach ($toRun as $version) {
+        if (!isset($files[$version])) {
+            echo colorize("Arquivo não encontrado para rollback: {$version}", 'red') . "\n";
+            continue;
+        }
 
-        if ($done !== false) {
-            $ranAt = $pdo->query("SELECT ran_at FROM migrations WHERE filename = " . $pdo->quote($name))
-                         ->fetchColumn();
-            $ranAt = date('d/m/Y H:i', strtotime($ranAt));
-            echo "  " . str_pad($name, 45) . "\e[32m" . str_pad("✅ rodada", 12) . "\e[0m" . $ranAt . "\n";
-        } else {
-            echo "  " . str_pad($name, 45) . "\e[33m" . str_pad("⏳ pendente", 12) . "\e[0m—\n";
+        echo "Revertendo {$version}... ";
+        try {
+            $migration = loadMigration($files[$version]);
+            $pdo->beginTransaction();
+
+            if (!method_exists($migration, 'down')) {
+                throw new \RuntimeException("Método down() não implementado em {$version}");
+            }
+
+            $migration->down($pdo);
+            $pdo->prepare("DELETE FROM migrations WHERE version = ?")->execute([$version]);
+            $pdo->commit();
+
+            echo colorize("✓", 'green') . "\n";
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            echo colorize("✗ ERRO: " . $e->getMessage(), 'red') . "\n";
+            exit(1);
         }
     }
-
-    echo "\n  Total: " . count($allFiles) . " migrations | "
-       . count($ran) . " executadas | "
-       . (count($allFiles) - count($ran)) . " pendentes\n\n";
 }
 
 // ── RESET ─────────────────────────────────────────────────────────────────────
-elseif ($command === 'reset') {
-    echo "\n  ⚠️  Revertendo TODAS as migrations...\n\n";
+function runReset(PDO $pdo, string $path): void
+{
+    $applied = count(getApplied($pdo));
+    echo "Revertendo {$applied} migration(s)...\n";
+    runDown($pdo, $path, $applied);
+}
 
-    $all = $pdo->query("SELECT filename FROM migrations ORDER BY id DESC")->fetchAll(PDO::FETCH_COLUMN);
+// ── FRESH ─────────────────────────────────────────────────────────────────────
+function runFresh(PDO $pdo, string $path): void
+{
+    echo colorize("⚠ Isso irá DESTRUIR todos os dados. Confirme (yes): ", 'red');
+    $confirm = trim(fgets(STDIN));
+    if ($confirm !== 'yes') { echo "Cancelado.\n"; exit(0); }
 
-    foreach ($all as $name) {
-        $file = dirname(__DIR__) . '/database/migrations/' . $name;
-        if (!file_exists($file)) continue;
+    runReset($pdo, $path);
+    runUp($pdo, $path, PHP_INT_MAX);
+}
 
-        try {
-            $pdo->beginTransaction();
-            $migration = require $file;
-            $migration->down($pdo);
-            $pdo->prepare("DELETE FROM migrations WHERE filename = ?")->execute([$name]);
-            $pdo->commit();
-            echo "  ↩️   {$name}\n";
-        } catch (\Throwable $e) {
-            $pdo->rollBack();
-            echo "  ❌  {$name} - ERRO: {$e->getMessage()}\n";
-            exit(1);
+// ── STATUS ────────────────────────────────────────────────────────────────────
+function runStatus(PDO $pdo, string $path): void
+{
+    $files   = getMigrationFiles($path);
+    $applied = getApplied($pdo);
+
+    echo "\n";
+    printf("%-50s %-10s %-10s\n", 'Migration', 'Status', 'Checksum');
+    echo str_repeat('-', 76) . "\n";
+
+    foreach ($files as $file) {
+        $version  = basename($file, '.php');
+        $checksum = fileChecksum($file);
+
+        if (!isset($applied[$version])) {
+            printf("%-50s %-10s\n", $version, colorize('pendente', 'yellow'));
+        } elseif ($applied[$version] !== $checksum) {
+            printf("%-50s %-10s %-10s\n", $version, colorize('modificada!', 'red'), "✗ checksum diverge");
+        } else {
+            printf("%-50s %-10s\n", $version, colorize('aplicada', 'green'));
         }
     }
 
-    echo "\n  Reset completo. Banco limpo. 🗑️\n\n";
+    echo "\n";
+    $pending = count(array_filter($files, fn($f) => !isset($applied[basename($f, '.php')])));
+    echo $pending > 0
+        ? colorize("{$pending} migration(s) pendente(s).", 'yellow') . "\n\n"
+        : colorize("Banco atualizado.", 'green') . "\n\n";
 }
 
-// ── COMANDO INVÁLIDO ──────────────────────────────────────────────────────────
-else {
-    echo "\n  Uso: php bin/migrate.php [comando] [passos]\n\n";
-    echo "  Comandos disponíveis:\n";
-    echo "    up              Roda todas as migrations pendentes\n";
-    echo "    rollback [N]    Reverte as últimas N migrations (padrão: 1)\n";
-    echo "    status          Lista o estado de todas as migrations\n";
-    echo "    reset           Reverte TODAS as migrations\n\n";
-    echo "  Para criar uma migration nova:\n";
-    echo "    php bin/make-migration.php nome_da_migration\n\n";
-    echo "  Exemplos:\n";
-    echo "    php bin/migrate.php up\n";
-    echo "    php bin/migrate.php rollback\n";
-    echo "    php bin/migrate.php rollback 3\n";
-    echo "    php bin/migrate.php status\n";
-    echo "    php bin/migrate.php reset\n\n";
-    echo "    php bin/make-migration.php create_budgets\n\n";
+// ── HELP ──────────────────────────────────────────────────────────────────────
+function showHelp(): void
+{
+    echo "\nUso: php bin/migrate.php [comando] [opções]\n\n";
+    echo "Comandos:\n";
+    echo "  status          Lista migrations e seus status (com detecção de checksum)\n";
+    echo "  up [n]          Aplica as próximas N migrations (padrão: todas)\n";
+    echo "  down [n]        Reverte as últimas N migrations (padrão: 1)\n";
+    echo "  rollback [n]    Alias para down\n";
+    echo "  reset           Reverte todas as migrations\n";
+    echo "  fresh           Reset + Up (DESTRÓI DADOS — pede confirmação)\n\n";
 }

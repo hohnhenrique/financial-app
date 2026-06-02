@@ -43,4 +43,7 @@ export const transactionsApi = {
 
   delete: (id: string) =>
     client.delete<ApiResponse>(`/transactions/${id}`),
+
+  restore: (id: string) =>
+      client.post<ApiResponse>(`/transactions/${id}/restore`),
 }

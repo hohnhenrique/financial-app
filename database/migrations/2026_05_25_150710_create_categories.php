@@ -35,6 +35,6 @@ return new class {
     }
 
     public function down(PDO $pdo): void {
-        $pdo->exec("DROP TABLE IF EXISTS categories;");
+        $pdo->exec("DROP TABLE IF EXISTS categories CASCADE");
     }
 };

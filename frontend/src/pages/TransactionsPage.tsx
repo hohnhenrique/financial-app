@@ -163,8 +163,26 @@ export function TransactionsPage() {
 
   // ── Confirmação de exclusão ───────────────────────────────────────────────
   const handleDelete = (tx: Transaction) => {
-    if (!window.confirm(`Excluir "${tx.description}"?`)) return
+    // Faz o soft-delete imediatamente
     deleteMut.mutate(String(tx.id))
+
+    // Toast com opção de desfazer por 5 segundos
+    toast.success(`"${tx.description}" excluída.`, {
+      duration: 5000,
+      action: {
+        label: 'Desfazer',
+        onClick: async () => {
+          // Chama endpoint de restore
+          try {
+            await transactionsApi.restore(String(tx.id))
+            qc.invalidateQueries({ queryKey: ['transactions'] })
+            toast.success('Exclusão desfeita!')
+          } catch {
+            toast.error('Não foi possível desfazer.')
+          }
+        },
+      },
+    })
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -519,12 +537,12 @@ export function TransactionsPage() {
                                     {/* Categoria */}
                                     <td className="px-6 py-4">
                                       <div className="flex items-center gap-2">
-                                        {tx.category_color && (
-                                            <span
-                                                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                                                style={{ background: tx.category_color }}
-                                            />
-                                        )}
+                                        {/*{tx.category_color && (*/}
+                                        {/*    <span*/}
+                                        {/*        className="w-2.5 h-2.5 rounded-full flex-shrink-0"*/}
+                                        {/*        style={{ background: tx.category_color }}*/}
+                                        {/*    />*/}
+                                        {/*)}*/}
                                         <span className="text-slate-500 dark:text-slate-400 truncate max-w-[100px]">
                                   {tx.category_name ?? '—'}
                                 </span>

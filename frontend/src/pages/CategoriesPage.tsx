@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { Alert } from '@/components/ui/Alert'
+import { useToast } from '@/context/ToastContext'
 import { Pagination } from '@/components/ui/Pagination'
 import { SortHeader } from '@/components/ui/SortHeader'
 import type { Category } from '@/types'
@@ -37,6 +37,7 @@ const EMPTY: CategoryPayload = { name: '', type: 'expense', color: '#1B4F8A', ic
 
 export function CategoriesPage() {
   const qc = useQueryClient()
+  const toast = useToast()
 
   // Paginação e ordenação
   const [page, setPage]       = useState(1)
@@ -47,8 +48,6 @@ export function CategoriesPage() {
   // Formulário
   const [form, setForm]       = useState<CategoryPayload>(EMPTY)
   const [editing, setEditing] = useState<Category | null>(null)
-  const [error, setError]     = useState('')
-  const [success, setSuccess] = useState('')
 
   // Busca todas e pagina no frontend (categorias são poucas)
   const { data: allCats } = useQuery({
@@ -73,12 +72,20 @@ export function CategoriesPage() {
 
   const createMut = useMutation({
     mutationFn: categoriesApi.create,
-    onSuccess:  () => { invalidate(); setForm(EMPTY); setSuccess('Categoria cadastrada!'); setError('') },
+    onSuccess:  () => { invalidate(); setForm(EMPTY); toast.success('Categoria cadastrada!') },
+    onError:    (e: unknown) => {
+      const msg = (e as {response?: {data?: {message?: string}}})?.response?.data?.message
+      toast.error(msg ?? 'Erro ao salvar categoria.')
+    },
   })
 
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: string; data: CategoryPayload }) => categoriesApi.update(id, data),
-    onSuccess:  () => { invalidate(); setEditing(null); setForm(EMPTY); setSuccess('Categoria atualizada!'); setError('') },
+    onSuccess:  () => { invalidate(); setEditing(null); setForm(EMPTY); toast.success('Categoria atualizada!') },
+    onError:    (e: unknown) => {
+      const msg = (e as {response?: {data?: {message?: string}}})?.response?.data?.message
+      toast.error(msg ?? 'Erro ao salvar categoria.')
+    },
   })
 
   const deleteMut = useMutation({
@@ -88,19 +95,14 @@ export function CategoriesPage() {
 
   const openEdit = (c: Category) => {
     setEditing(c)
-    setError('')
-    setSuccess('')
     setForm({ name: c.name, type: c.type, color: c.color, icon: c.icon })
   }
 
   const handleSubmit = async () => {
-    setError(''); setSuccess('')
     try {
       if (editing) await updateMut.mutateAsync({ id: String(editing.id), data: form })
       else         await createMut.mutateAsync(form)
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setError(msg ?? 'Erro ao salvar.')
     }
   }
 
@@ -114,8 +116,6 @@ export function CategoriesPage() {
       {/* Formulário */}
       <Card title={editing ? 'Editar Categoria' : 'Nova Categoria'} subtitle="Organize receitas e despesas." padding>
         <div className="space-y-5">
-          {error   && <Alert type="error"   message={error}   />}
-          {success && <Alert type="success" message={success} />}
 
           <Input
             label="Nome"
