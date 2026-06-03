@@ -18,6 +18,10 @@ import { ImportPage }   from '@/pages/ImportPage'
 import { VisibilityProvider } from '@/context/VisibilityContext'
 import { ReportsPage } from '@/pages/ReportsPage'
 import { ToastProvider } from '@/context/ToastContext'
+import { BudgetPage }         from '@/pages/BudgetPage'
+import { PersonalGoalsPage }  from '@/pages/PersonalGoalsPage'
+import { PersonalHabitsPage } from '@/pages/PersonalHabitsPage'
+import { PersonalTasksPage }  from '@/pages/PersonalTasksPage'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } }
@@ -46,6 +50,10 @@ export default function App() {
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="import" element={<ImportPage />} />
                     <Route path="reports" element={<ReportsPage />} />
+                    <Route path="budget"  element={<BudgetPage />} />
+                    <Route path="goals"   element={<PersonalGoalsPage />} />
+                    <Route path="habits"  element={<PersonalHabitsPage />} />
+                    <Route path="tasks"   element={<PersonalTasksPage />} />
                   </Route>
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

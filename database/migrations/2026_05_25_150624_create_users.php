@@ -3,8 +3,7 @@ return new class {
     public function up(PDO $pdo): void {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS users (
-                id              BIGSERIAL PRIMARY KEY,
-                name            VARCHAR(150) NOT NULL,
+                id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 email           VARCHAR(255) NOT NULL,
                 password_hash   VARCHAR(255) NOT NULL,
                 currency        CHAR(3) NOT NULL DEFAULT 'BRL',

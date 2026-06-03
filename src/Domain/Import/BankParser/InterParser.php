@@ -6,6 +6,18 @@ namespace App\Domain\Import\BankParser;
 
 use App\Domain\Import\ImportedTransaction;
 
+/**
+ * Banco Inter — Extrato Conta Corrente
+ *
+ * Formato real (CSV com ';', ISO-8859-1):
+ *   Extrato Conta Corrente
+ *   Conta ;61014117
+ *   Período ;01/05/2026 a 31/05/2026
+ *   Saldo ;39.587,24
+ *   (linha vazia)
+ *   Data Lançamento;Histórico;Descrição;Valor;Saldo
+ *   30/05/2026;Pix enviado ;Gustavo Fidelis;-15,00;39.587,24
+ */
 final class InterParser
 {
     /** @return ImportedTransaction[] */
@@ -18,27 +30,43 @@ final class InterParser
 
         foreach ($rows as $row) {
             if (!$started) {
-                $cols = array_map(fn($c) => mb_strtolower(trim($c)), $row);
-                if (in_array('data', $cols) || in_array('dt. movimento', $cols)) {
+                // Detecta a linha de cabeçalho real
+                $first = mb_strtolower(trim($row[0] ?? ''));
+                if ($first === 'data lançamento' || $first === 'data lancamento' || $first === 'data') {
                     $started = true;
                 }
                 continue;
             }
 
-            if (count($row) < 3) continue;
+            // Precisa de ao menos data e valor
+            if (count($row) < 4) continue;
 
             $rawDate  = trim($row[0] ?? '');
-            $desc     = count($row) >= 4 ? trim($row[2]) : trim($row[1]);
-            $rawValue = count($row) >= 4 ? trim($row[3]) : trim($row[2]);
+            $historic = trim($row[1] ?? '');
+            $descr    = trim($row[2] ?? '');
+            $rawValue = trim($row[3] ?? '');
+
+            if ($rawDate === '' || $rawValue === '') continue;
 
             $date  = self::parseDate($rawDate);
             $cents = self::parseMoney($rawValue);
 
-            if (!$date || $cents === null || $desc === '') continue;
+            if (!$date || $cents === null) continue;
+
+            // Monta descrição: usa $descr se preenchido, senão usa $historic
+            // Ex: "Pix enviado" + "Gustavo Fidelis" → "Gustavo Fidelis"
+            // Ex: "Salário recebido - Portabilidade" + "" → "Salário recebido - Portabilidade"
+            $description = $descr !== '' ? $descr : $historic;
+            if ($description === '') continue;
+
+            // Adiciona contexto do tipo quando a descrição é só o nome do destinatário
+            if ($descr !== '' && $historic !== '') {
+                $description = "{$historic}: {$descr}";
+            }
 
             $result[] = new ImportedTransaction(
                 date:        $date,
-                description: $desc,
+                description: $description,
                 amountCents: abs($cents),
                 type:        $cents >= 0 ? 'income' : 'expense',
                 raw:         $row,
@@ -50,13 +78,16 @@ final class InterParser
 
     private static function normalizeEncoding(string $content): string
     {
+        // Remove BOM UTF-8 se houver
         if (str_starts_with($content, "\xEF\xBB\xBF")) {
             $content = substr($content, 3);
         }
+
         $enc = mb_detect_encoding($content, ['UTF-8', 'ISO-8859-1', 'Windows-1252'], true);
         if ($enc && $enc !== 'UTF-8') {
             $content = mb_convert_encoding($content, 'UTF-8', $enc);
         }
+
         return $content;
     }
 

@@ -16,6 +16,9 @@ use App\Http\Routes\ImportRoutes;
 use App\Http\Routes\GoalRoutes;
 use App\Http\Routes\ReportRoutes;
 use App\Http\Routes\NotificationRoutes;
+use App\Http\Routes\PersonalRoutes;
+use App\Http\Routes\BudgetRoutes;
+use App\Http\Routes\SearchRoutes;
 
 $router = new Router();
 
@@ -31,6 +34,9 @@ ImportRoutes::register($router);
 GoalRoutes::register($router);
 ReportRoutes::register($router);
 NotificationRoutes::register($router);
+PersonalRoutes::register($router);
+BudgetRoutes::register($router);
+SearchRoutes::register($router);
 
 // SPA fallback - qualquer rota não-API serve o React
 $router->get('/{any}', [SpaController::class, 'index']);

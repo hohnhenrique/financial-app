@@ -3,8 +3,8 @@ return new class {
     public function up(PDO $pdo): void {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS user_sessions (
-                id          BIGSERIAL PRIMARY KEY,
-                user_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 token_hash  VARCHAR(255) NOT NULL,
                 ip_address  INET,
                 user_agent  TEXT,

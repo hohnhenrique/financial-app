@@ -3,8 +3,8 @@ return new class {
     public function up(PDO $pdo): void {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS categories (
-                id          BIGSERIAL PRIMARY KEY,
-                user_id     BIGINT REFERENCES users(id) ON DELETE CASCADE,
+                id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id     UUID NULL REFERENCES users(id) ON DELETE CASCADE,
                 name        VARCHAR(80) NOT NULL,
                 type        VARCHAR(10) NOT NULL DEFAULT 'both'
                             CHECK (type IN ('income','expense','both')),

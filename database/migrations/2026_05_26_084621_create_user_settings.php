@@ -3,8 +3,8 @@ return new class {
     public function up(PDO $pdo): void {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS user_settings (
-                id                  BIGSERIAL PRIMARY KEY,
-                user_id             BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 session_lifetime    INTEGER NOT NULL DEFAULT 480,
                 primary_color       CHAR(7) NOT NULL DEFAULT '#1B4F8A',
                 sidebar_color_from  CHAR(7) NOT NULL DEFAULT '#0f172a',

@@ -12,7 +12,7 @@ import { useToast } from '@/context/ToastContext'
 
 const BANKS = [
   { value: 'rico',     label: '💳 Rico — Cartão de Crédito' },
-  { value: 'inter',    label: '🟠 Banco Inter — Conta / Cartão' },
+  { value: 'inter',    label: '🟠 Banco Inter — Conta Corrente' },
   { value: 'nubank',   label: '💜 Nubank — Cartão / Conta' },
   { value: 'itau',     label: '🟡 Itaú — Conta Corrente' },
   { value: 'bradesco', label: '🔴 Bradesco — Conta Corrente' },
@@ -21,7 +21,7 @@ const BANKS = [
 
 const BANK_INSTRUCTIONS: Record<string, { title: string; steps: string[] }> = {
   rico:     { title: '💳 Rico — Cartão de Crédito',  steps: ['Acesse o app ou site da Rico', 'Vá em Cartão → Fatura', 'Clique em "Exportar" → CSV'] },
-  inter:    { title: '🟠 Banco Inter',               steps: ['App Inter → Extrato → Período', 'Toque em "Exportar" → CSV'] },
+  inter:    { title: '🟠 Banco Inter',               steps: ['App Inter → Extrato → Período', 'Toque em "Exportar" → Escolha CSV', 'O arquivo vem com nome tipo Extrato-DD-MM-AAAA...CSV.csv'] },
   nubank:   { title: '💜 Nubank',                    steps: ['App → Perfil → Meus dados', '"Exportar dados" → Transações CSV'] },
   itau:     { title: '🟡 Itaú',                      steps: ['Internet Banking → Conta → Extrato', 'Clique em "Exportar" → CSV'] },
   bradesco: { title: '🔴 Bradesco',                  steps: ['Internet Banking → Extrato', '"Exportar" → CSV'] },
@@ -30,24 +30,27 @@ const BANK_INSTRUCTIONS: Record<string, { title: string; steps: string[] }> = {
 
 type Step = 'upload' | 'review' | 'done'
 
+/** Converte "2025-12-03" → "03/12/2025" */
+function isoToBR(iso: string): string {
+  if (!iso || !iso.includes('-')) return iso
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
+
 export function ImportPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const toast   = useToast()
 
-  // ── Step upload ───────────────────────────────────────────────────────────
   const [step,             setStep]             = useState<Step>('upload')
   const [bank,             setBank]             = useState('rico')
   const [defaultAccountId, setDefaultAccountId] = useState('')
-  const [globalDate,       setGlobalDate]       = useState('')   // opcional — sobrescreve todas as datas
+  const [globalDate,       setGlobalDate]       = useState('')
   const [fileName,         setFileName]         = useState('')
+  const [rows,             setRows]             = useState<ImportedRow[]>([])
+  const [result,           setResult]           = useState<{ imported: number } | null>(null)
+  const [loading,          setLoading]          = useState(false)
+  const [error,            setError]            = useState('')
 
-  // ── Step review ───────────────────────────────────────────────────────────
-  const [rows,    setRows]    = useState<ImportedRow[]>([])
-  const [result,  setResult]  = useState<{ imported: number } | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
-
-  // ── Queries ───────────────────────────────────────────────────────────────
   const { data: accountsData } = useQuery({
     queryKey:       ['accounts-all'],
     queryFn:        () => accountsApi.listAll().then(r => r.data.data),
@@ -75,16 +78,30 @@ export function ImportPage() {
     try {
       const res  = await importApi.preview(file, bank)
       const data = res.data.data
+
       if (data.total === 0) { setError('Nenhuma transação encontrada no arquivo.'); return }
 
-      setRows(data.transactions.map(t => ({
-        ...t,
-        // Se o usuário preencheu data global, usa ela; senão usa a do CSV
-        date:        globalDate || t.date,
-        selected:    true,
-        account_id:  defaultAccountId,
-        category_id: '',
-      })))
+      setRows(data.transactions.map(t => {
+        const csvDate  = t.date            // data original do CSV (ISO)
+        const saveDate = globalDate || t.date  // data que será salva
+
+        // Descrição final: "MP*MERCADOLIVRE [7 de 10] - 03/12/2025"
+        // Usa sempre a data original do CSV para a concatenação
+        const description = `${t.description} - ${isoToBR(csvDate)}`
+
+        return {
+          date:              saveDate,
+          original_date:     csvDate,
+          description,
+          amount_cents:      t.amount_cents,
+          type:              t.type,
+          original_category: t.original_category,
+          selected:          true,
+          account_id:        defaultAccountId,
+          category_id:       '',
+        }
+      }))
+
       setStep('review')
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -101,12 +118,13 @@ export function ImportPage() {
       setError(`${missing.length} movimentação(ões) sem categoria. Selecione ou desmarque.`)
       return
     }
+
     setLoading(true); setError('')
     try {
       const res = await importApi.confirm(rows)
       setResult(res.data.data)
       setStep('done')
-      toast.success(`${res.data.data.imported} movimentações importadas!`)
+      toast.success(`${res.data.data.imported} movimentações importadas com sucesso!`)
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
       toast.error(msg ?? 'Erro ao importar.')
@@ -115,26 +133,16 @@ export function ImportPage() {
     }
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
   const update      = (i: number, patch: Partial<ImportedRow>) =>
     setRows(p => p.map((r, idx) => idx === i ? { ...r, ...patch } : r))
-
   const selectAll   = () => setRows(p => p.map(r => ({ ...r, selected: true })))
   const deselectAll = () => setRows(p => p.map(r => ({ ...r, selected: false })))
   const setCatAll   = (catId: string) => setRows(p => p.map(r => ({ ...r, category_id: catId })))
 
-  const selected = rows.filter(r => r.selected)
-  const missing  = selected.filter(r => !r.category_id).length
-
-  // Totais das selecionadas
-  const totalExpense = selected
-    .filter(r => r.type === 'expense')
-    .reduce((sum, r) => sum + r.amount_cents, 0)
-  const totalIncome = selected
-    .filter(r => r.type === 'income')
-    .reduce((sum, r) => sum + r.amount_cents, 0)
-
-  const instructions = BANK_INSTRUCTIONS[bank]
+  const selected     = rows.filter(r => r.selected)
+  const missing      = selected.filter(r => !r.category_id).length
+  const totalExpense = selected.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount_cents, 0)
+  const totalIncome  = selected.filter(r => r.type === 'income').reduce((s, r) => s + r.amount_cents, 0)
 
   // ─────────────────────────────────────────────────────────────────────────
   // STEP: upload
@@ -167,7 +175,7 @@ export function ImportPage() {
             <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
               Data única{' '}
               <span className="text-xs font-normal text-slate-400">
-                (opcional — se preenchida, todas as movimentações recebem essa data)
+                (opcional — se preenchida, todas as movimentações são salvas com essa data)
               </span>
             </label>
             <input
@@ -179,16 +187,16 @@ export function ImportPage() {
                          focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
             />
             {globalDate && (
-              <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
-                ⚠️ Todas as movimentações receberão a data {formatDate(globalDate)}.
-                <button onClick={() => setGlobalDate('')} className="ml-2 underline hover:no-underline">
+              <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <span>⚠️ Todas as movimentações serão salvas com a data {formatDate(globalDate)}. A data original do CSV aparecerá na descrição.</span>
+                <button onClick={() => setGlobalDate('')} className="underline hover:no-underline ml-1 flex-shrink-0">
                   Remover
                 </button>
               </p>
             )}
           </div>
 
-          {/* Área de upload */}
+          {/* Arquivo */}
           <div>
             <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
               Arquivo CSV *
@@ -224,9 +232,11 @@ export function ImportPage() {
 
           {/* Instruções */}
           <div className="bg-slate-50 dark:bg-slate-700/30 rounded-xl p-4 space-y-2">
-            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">{instructions.title}</p>
+            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+              {BANK_INSTRUCTIONS[bank].title}
+            </p>
             <ol className="list-decimal list-inside space-y-1">
-              {instructions.steps.map((s, i) => (
+              {BANK_INSTRUCTIONS[bank].steps.map((s, i) => (
                 <li key={i} className="text-xs text-slate-500 dark:text-slate-400">{s}</li>
               ))}
             </ol>
@@ -245,8 +255,6 @@ export function ImportPage() {
   // ─────────────────────────────────────────────────────────────────────────
   if (step === 'review') return (
     <div className="space-y-5">
-
-      {/* Cabeçalho */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Revisar movimentações</h2>
@@ -264,9 +272,17 @@ export function ImportPage() {
       {/* Ações em massa */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 px-5 py-3 flex flex-wrap gap-4 items-center shadow-sm">
         <div className="flex items-center gap-3 text-xs">
-          <button onClick={selectAll}    className="font-medium hover:underline" style={{ color: 'var(--color-primary)' }}>Selecionar todas</button>
+          <button
+            onClick={selectAll}
+            className="font-medium hover:underline"
+            style={{ color: 'var(--color-primary)' }}
+          >
+            Selecionar todas
+          </button>
           <span className="text-slate-300 dark:text-slate-600">|</span>
-          <button onClick={deselectAll}  className="text-slate-500 dark:text-slate-400 hover:underline">Desmarcar todas</button>
+          <button onClick={deselectAll} className="text-slate-500 dark:text-slate-400 hover:underline">
+            Desmarcar todas
+          </button>
         </div>
 
         <div className="h-4 w-px bg-slate-200 dark:bg-slate-600" />
@@ -286,7 +302,7 @@ export function ImportPage() {
 
       {/* Tabela */}
       <Card>
-        <div className="overflow-x-auto" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+        <div className="overflow-x-auto" style={{ maxHeight: '62vh', overflowY: 'auto' }}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-slate-50 dark:bg-slate-700/90 border-b border-slate-100 dark:border-slate-700">
@@ -298,10 +314,15 @@ export function ImportPage() {
                     className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
                   />
                 </th>
-                <th className="px-4 py-3 text-slate-500 dark:text-slate-400 font-medium text-left w-36">Data</th>
-                <th className="px-4 py-3 text-slate-500 dark:text-slate-400 font-medium text-left">Descrição</th>
-                <th className="px-4 py-3 text-slate-500 dark:text-slate-400 font-medium text-left w-32">Tipo</th>
-                <th className="px-4 py-3 text-slate-500 dark:text-slate-400 font-medium text-right w-32">Valor</th>
+                <th className="px-4 py-3 text-slate-500 dark:text-slate-400 font-medium text-left w-36">
+                  Data salva
+                </th>
+                <th className="px-4 py-3 text-slate-500 dark:text-slate-400 font-medium text-left">
+                  Descrição
+                  <span className="ml-1 text-[10px] font-normal text-slate-400">(editável)</span>
+                </th>
+                <th className="px-4 py-3 text-slate-500 dark:text-slate-400 font-medium text-left w-28">Tipo</th>
+                <th className="px-4 py-3 text-slate-500 dark:text-slate-400 font-medium text-right w-28">Valor</th>
                 <th className="px-4 py-3 text-slate-500 dark:text-slate-400 font-medium text-left w-40">Conta</th>
                 <th className="px-4 py-3 text-slate-500 dark:text-slate-400 font-medium text-left w-40">
                   Categoria <span className="text-red-400">*</span>
@@ -329,7 +350,7 @@ export function ImportPage() {
                     />
                   </td>
 
-                  {/* Data — editável por linha */}
+                  {/* Data — editável */}
                   <td className="px-4 py-2.5">
                     <input
                       type="date"
@@ -342,26 +363,22 @@ export function ImportPage() {
                     />
                   </td>
 
-                  {/* Descrição — input editável pré-preenchido */}
+                  {/* Descrição — input editável pré-preenchido com data concatenada */}
                   <td className="px-4 py-2.5">
                     <input
                       type="text"
                       value={row.description}
                       onChange={e => update(i, { description: e.target.value })}
                       disabled={!row.selected}
+                      title={row.description}
                       className="w-full px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg
                                  bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs
                                  focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-50
-                                 min-w-[160px]"
+                                 min-w-[200px]"
                     />
-                    {row.original_category && (
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block truncate">
-                        {row.original_category}
-                      </span>
-                    )}
                   </td>
 
-                  {/* Tipo — clicável para inverter */}
+                  {/* Tipo */}
                   <td className="px-4 py-2.5">
                     <button
                       onClick={() => update(i, { type: row.type === 'income' ? 'expense' : 'income' })}
@@ -425,7 +442,7 @@ export function ImportPage() {
           </table>
         </div>
 
-        {/* Rodapé com totais + botão */}
+        {/* Rodapé — totais + botão */}
         <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-700">
           {missing > 0 && (
             <p className="text-amber-500 dark:text-amber-400 text-xs font-medium mb-3">
@@ -436,8 +453,8 @@ export function ImportPage() {
           <div className="flex items-center justify-between gap-4 flex-wrap">
             {/* Totais */}
             <div className="flex items-center gap-5">
-              <div className="text-sm">
-                <span className="text-slate-400 dark:text-slate-500 text-xs">Despesas selecionadas</span>
+              <div>
+                <p className="text-xs text-slate-400 dark:text-slate-500">Despesas</p>
                 <p className="font-bold text-red-500 dark:text-red-400 text-base leading-tight">
                   {formatMoney(totalExpense)}
                 </p>
@@ -446,8 +463,8 @@ export function ImportPage() {
               {totalIncome > 0 && (
                 <>
                   <div className="w-px h-8 bg-slate-200 dark:bg-slate-600" />
-                  <div className="text-sm">
-                    <span className="text-slate-400 dark:text-slate-500 text-xs">Receitas selecionadas</span>
+                  <div>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">Receitas</p>
                     <p className="font-bold text-emerald-600 dark:text-emerald-400 text-base leading-tight">
                       {formatMoney(totalIncome)}
                     </p>
@@ -457,12 +474,11 @@ export function ImportPage() {
 
               <div className="w-px h-8 bg-slate-200 dark:bg-slate-600" />
 
-              <div className="text-xs text-slate-500 dark:text-slate-400">
-                {selected.length} de {rows.length} serão importadas
-              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {selected.length} de {rows.length} selecionadas
+              </p>
             </div>
 
-            {/* Botão importar */}
             <Button
               onClick={handleConfirm}
               loading={loading}
