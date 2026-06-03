@@ -10,7 +10,7 @@ use App\Domain\Category\CategoryRepositoryInterface;
 
 final class PdoCategoryRepository extends AbstractRepository implements CategoryRepositoryInterface
 {
-    public function findByUser(int $userId): array
+    public function findByUser(string $userId): array
     {
         $rows = $this->fetchAll("
             SELECT * FROM categories
@@ -20,7 +20,7 @@ final class PdoCategoryRepository extends AbstractRepository implements Category
         return array_map(Category::fromArray(...), $rows);
     }
 
-    public function findById(int $id, int $userId): ?Category
+    public function findById(string $id, string $userId): ?Category
     {
         $row = $this->fetchOne(
             'SELECT * FROM categories WHERE id = ? AND user_id = ?',
@@ -43,10 +43,10 @@ final class PdoCategoryRepository extends AbstractRepository implements Category
             'icon'    => $dto->icon,
         ]);
 
-        return $this->findById((int) $id, $dto->userId);
+        return $this->findById((string) $id, $dto->userId);
     }
 
-    public function update(int $id, int $userId, CategoryDTO $dto): Category
+    public function update(string $id, string $userId, CategoryDTO $dto): Category
     {
         $this->query("
             UPDATE categories SET name = :name, type = :type, color = :color, icon = :icon
@@ -62,7 +62,7 @@ final class PdoCategoryRepository extends AbstractRepository implements Category
         return $this->findById($id, $userId);
     }
 
-    public function delete(int $id, int $userId): bool
+    public function delete(string $id, string $userId): bool
     {
         $this->query(
             'DELETE FROM categories WHERE id = ? AND user_id = ?',

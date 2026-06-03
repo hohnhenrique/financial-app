@@ -10,7 +10,7 @@ use App\Domain\Account\AccountRepositoryInterface;
 
 final class PdoAccountRepository extends AbstractRepository implements AccountRepositoryInterface
 {
-    public function findByUser(int $userId): array
+    public function findByUser(string $userId): array
     {
         $rows = $this->fetchAll(
             'SELECT * FROM accounts WHERE deleted_at IS NULL AND user_id = ? ORDER BY created_at DESC',
@@ -19,7 +19,7 @@ final class PdoAccountRepository extends AbstractRepository implements AccountRe
         return array_map(Account::fromArray(...), $rows);
     }
 
-    public function findById(int $id, int $userId): ?Account
+    public function findById(string $id, string $userId): ?Account
     {
         $row = $this->fetchOne(
             'SELECT * FROM accounts WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
@@ -43,10 +43,10 @@ final class PdoAccountRepository extends AbstractRepository implements AccountRe
             'is_hidden'             => $dto->isHidden ? 'true' : 'false',
         ]);
 
-        return $this->findById((int) $id, $dto->userId);
+        return $this->findById((string) $id, $dto->userId);
     }
 
-    public function update(int $id, int $userId, AccountDTO $dto): Account
+    public function update(string $id, string $userId, AccountDTO $dto): Account
     {
         $this->query("
             UPDATE accounts SET
@@ -69,7 +69,7 @@ final class PdoAccountRepository extends AbstractRepository implements AccountRe
         return $this->findById($id, $userId);
     }
 
-    public function delete(int $id, int $userId): bool
+    public function delete(string $id, string $userId): bool
     {
         $this->query(
             'UPDATE accounts SET deleted_at = now() WHERE id = ? AND user_id = ?',

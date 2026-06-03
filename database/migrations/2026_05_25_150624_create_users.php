@@ -4,6 +4,7 @@ return new class {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS users (
                 id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                name            VARCHAR(90) NOT NULL,
                 email           VARCHAR(255) NOT NULL,
                 password_hash   VARCHAR(255) NOT NULL,
                 currency        CHAR(3) NOT NULL DEFAULT 'BRL',

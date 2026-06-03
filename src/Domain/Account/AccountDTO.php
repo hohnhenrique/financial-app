@@ -7,7 +7,7 @@ namespace App\Domain\Account;
 final class AccountDTO
 {
     public function __construct(
-        public readonly int    $userId,
+        public readonly string    $userId,
         public readonly string $name,
         public readonly string $type,
         public readonly int    $initialBalanceCents,
@@ -15,7 +15,7 @@ final class AccountDTO
         public readonly bool   $isHidden,
     ) {}
 
-    public static function fromRequest(array $post, int $userId): self
+    public static function fromRequest(array $post, string $userId): self
     {
         $raw        = str_replace(['.', ','], ['', '.'], trim($post['initial_balance'] ?? '0'));
         $cents      = (int) round((float) $raw * 100);

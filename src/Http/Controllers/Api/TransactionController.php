@@ -56,7 +56,7 @@ final class TransactionController extends ApiController
     {
         $this->requireAuth();
         try {
-            $tx = $this->service->findById((int) $id, $this->userId());
+            $tx = $this->service->findById((string) $id, $this->userId());
             return $this->success((new TransactionResource($tx))->toArray());
         } catch (\RuntimeException $e) {
             return $this->error($e->getMessage(), 404);
@@ -90,7 +90,7 @@ final class TransactionController extends ApiController
         $this->requireAuth();
         try {
             $tx = $this->service->update(
-                (int) $id,
+                (string) $id,
                 $this->userId(),
                 TransactionDTO::fromRequest($this->body(), $this->userId())
             );
@@ -105,7 +105,7 @@ final class TransactionController extends ApiController
     {
         $this->requireAuth();
         try {
-            $this->service->delete((int) $id, $this->userId());
+            $this->service->delete((string) $id, $this->userId());
             return $this->success(null, 'Movimentação excluída.');
         } catch (\RuntimeException $e) {
             return $this->error($e->getMessage(), 404);

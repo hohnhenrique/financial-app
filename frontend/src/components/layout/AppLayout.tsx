@@ -23,7 +23,10 @@ const PAGE_TITLES: Record<string, string> = {
   '/goals':            'Metas',
   '/reports':          'Relatórios',
   '/import':           'Importar Extrato',
-  '/profile':          'Meu Perfil',
+  '/budget':           'Orçamento por Categoria',
+  '/personal/goals':   'Metas pessoais',
+  '/habits':           'Hábitos',
+  '/tasks':             'Tarefas',
   '/settings':         'Configurações',
   '/admin/users':      'Usuários do Sistema',
 }
@@ -70,12 +73,12 @@ export function AppLayout() {
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 capitalize">{formatDatePtBR()}</p>
           </div>
           <div className="flex items-center gap-1">
+            <GlobalSearch />
             <button onClick={toggle} title={visible ? 'Ocultar valores' : 'Mostrar valores'}
               className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">
               {visible ? <EyeIcon /> : <EyeOffIcon />}
             </button>
             <InstallPWA />
-            <GlobalSearch />
             <NotificationBell />
             <button onClick={toggleDark} title={dark ? 'Modo claro' : 'Modo escuro'}
               className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">

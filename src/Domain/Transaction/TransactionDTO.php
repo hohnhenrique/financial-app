@@ -9,9 +9,9 @@ use App\Domain\Shared\Money;
 final class TransactionDTO
 {
     public function __construct(
-        public readonly int     $userId,
-        public readonly int     $accountId,
-        public readonly int     $categoryId,
+        public readonly string  $userId,
+        public readonly string  $accountId,
+        public readonly string  $categoryId,
         public readonly string  $type,
         public readonly Money   $amount,
         public readonly string  $description,
@@ -19,12 +19,12 @@ final class TransactionDTO
         public readonly ?string $notes = null,
     ) {}
 
-    public static function fromRequest(array $post, int $userId): self
+    public static function fromRequest(array $post, string $userId): self
     {
         return new self(
             userId:          $userId,
-            accountId:       (int) ($post['account_id']  ?? 0),
-            categoryId:      (int) ($post['category_id'] ?? 0),
+            accountId:       (string) ($post['account_id']  ?? 0),
+            categoryId:      (string) ($post['category_id'] ?? 0),
             type:            $post['type']             ?? 'expense',
             amount:          Money::fromString($post['amount'] ?? '0'),
             description:     trim($post['description'] ?? ''),

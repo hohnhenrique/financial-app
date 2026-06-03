@@ -38,7 +38,7 @@ final class CategoryController extends ApiController
     {
         $this->requireAuth();
         try {
-            $cat = $this->service->update((int) $id, $this->userId(), CategoryDTO::fromRequest($this->body(), $this->userId()));
+            $cat = $this->service->update((string) $id, $this->userId(), CategoryDTO::fromRequest($this->body(), $this->userId()));
             return $this->success($this->serialize($cat), 'Categoria atualizada.');
         } catch (\Exception $e) {
             return $this->error($e->getMessage());
@@ -49,7 +49,7 @@ final class CategoryController extends ApiController
     {
         $this->requireAuth();
         try {
-            $this->service->delete((int) $id, $this->userId());
+            $this->service->delete((string) $id, $this->userId());
             return $this->success(null, 'Categoria excluída.');
         } catch (\RuntimeException $e) {
             return $this->error($e->getMessage(), 400);

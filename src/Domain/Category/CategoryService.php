@@ -17,12 +17,12 @@ final class CategoryService
         private readonly CategoryRepositoryInterface $repository,
     ) {}
 
-    public function listByUser(int $userId): array
+    public function listByUser(string $userId): array
     {
         return $this->repository->findByUser($userId);
     }
 
-    public function findById(int $id, int $userId): Category
+    public function findById(string $id, string $userId): Category
     {
         return $this->repository->findById($id, $userId)
             ?? throw new \RuntimeException('Categoria não encontrada.');
@@ -34,13 +34,13 @@ final class CategoryService
         return $this->repository->save($dto);
     }
 
-    public function update(int $id, int $userId, CategoryDTO $dto): Category
+    public function update(string $id, string $userId, CategoryDTO $dto): Category
     {
         $this->validate($dto);
         return $this->repository->update($id, $userId, $dto);
     }
 
-    public function delete(int $id, int $userId): bool
+    public function delete(string $id, string $userId): bool
     {
         $cat = $this->findById($id, $userId);
         if ($cat->isGlobal()) {

@@ -51,7 +51,7 @@ export default function App() {
                     <Route path="import" element={<ImportPage />} />
                     <Route path="reports" element={<ReportsPage />} />
                     <Route path="budget"  element={<BudgetPage />} />
-                    <Route path="goals"   element={<PersonalGoalsPage />} />
+                    <Route path="/personal/goals"   element={<PersonalGoalsPage />} />
                     <Route path="habits"  element={<PersonalHabitsPage />} />
                     <Route path="tasks"   element={<PersonalTasksPage />} />
                   </Route>

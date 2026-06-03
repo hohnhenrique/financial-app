@@ -7,13 +7,13 @@ namespace App\Domain\Category;
 interface CategoryRepositoryInterface
 {
     /** @return Category[] */
-    public function findByUser(int $userId): array;
+    public function findByUser(string $userId): array;
 
-    public function findById(int $id, int $userId): ?Category;
+    public function findById(string $id, string $userId): ?Category;
 
     public function save(CategoryDTO $dto): Category;
 
-    public function update(int $id, int $userId, CategoryDTO $dto): Category;
+    public function update(string $id, string $userId, CategoryDTO $dto): Category;
 
-    public function delete(int $id, int $userId): bool;
+    public function delete(string $id, string $userId): bool;
 }

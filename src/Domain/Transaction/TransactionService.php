@@ -10,43 +10,43 @@ final class TransactionService
         private readonly TransactionRepositoryInterface $repository,
     ) {}
 
-    public function listByUser(int $userId, array $filters = []): array
+    public function listByUser(string $userId, array $filters = []): array
     {
         return $this->repository->findByUser($userId, $filters);
     }
 
-    public function listPaginated(int $userId, int $page, int $perPage, array $filters = []): array
+    public function listPaginated(string $userId, int $page, int $perPage, array $filters = []): array
     {
         return $this->repository->findByUserPaginated($userId, $page, $perPage, $filters);
     }
 
-    public function countByUser(int $userId, array $filters = []): int
+    public function countByUser(string $userId, array $filters = []): int
     {
         return $this->repository->countByUser($userId, $filters);
     }
 
-    public function findById(int $id, int $userId): Transaction
+    public function findById(string $id, string $userId): Transaction
     {
         return $this->repository->findById($id, $userId)
             ?? throw new \RuntimeException('Movimentação não encontrada.');
     }
 
-    public function monthlySummary(int $userId, string $yearMonth): array
+    public function monthlySummary(string $userId, string $yearMonth): array
     {
         return $this->repository->monthlySummary($userId, $yearMonth);
     }
 
-    public function last6MonthsChart(int $userId): array
+    public function last6MonthsChart(string $userId): array
     {
         return $this->repository->last6MonthsChart($userId);
     }
 
-    public function expensesByCategory(int $userId, string $yearMonth): array
+    public function expensesByCategory(string $userId, string $yearMonth): array
     {
         return $this->repository->expensesByCategory($userId, $yearMonth);
     }
 
-    public function reportByCategory(int $userId, array $filters): array
+    public function reportByCategory(string $userId, array $filters): array
     {
         return $this->repository->reportByCategory($userId, $filters);
     }
@@ -57,13 +57,13 @@ final class TransactionService
         return $this->repository->save($dto);
     }
 
-    public function update(int $id, int $userId, TransactionDTO $dto): Transaction
+    public function update(string $id, string $userId, TransactionDTO $dto): Transaction
     {
         $this->validate($dto);
         return $this->repository->update($id, $userId, $dto);
     }
 
-    public function delete(int $id, int $userId): bool
+    public function delete(string $id, string $userId): bool
     {
         $this->findById($id, $userId);
         return $this->repository->delete($id, $userId);

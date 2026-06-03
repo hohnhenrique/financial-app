@@ -7,13 +7,13 @@ namespace App\Domain\Account;
 interface AccountRepositoryInterface
 {
     /** @return Account[] */
-    public function findByUser(int $userId): array;
+    public function findByUser(string $userId): array;
 
-    public function findById(int $id, int $userId): ?Account;
+    public function findById(string $id, string $userId): ?Account;
 
     public function save(AccountDTO $dto): Account;
 
-    public function update(int $id, int $userId, AccountDTO $dto): Account;
+    public function update(string $id, string $userId, AccountDTO $dto): Account;
 
-    public function delete(int $id, int $userId): bool;
+    public function delete(string $id, string $userId): bool;
 }

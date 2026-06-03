@@ -7,8 +7,8 @@ namespace App\Domain\Account;
 final class Account
 {
     public function __construct(
-        public readonly int     $id,
-        public readonly int     $userId,
+        public readonly string  $id,
+        public readonly string  $userId,
         public readonly string  $name,
         public readonly string  $type,
         public readonly string  $currency,
@@ -22,8 +22,8 @@ final class Account
     public static function fromArray(array $data): self
     {
         return new self(
-            id:                  (int) $data['id'],
-            userId:              (int) $data['user_id'],
+            id:                  (string) $data['id'],
+            userId:              (string) $data['user_id'],
             name:                $data['name'],
             type:                $data['type'],
             currency:            $data['currency'] ?? 'BRL',

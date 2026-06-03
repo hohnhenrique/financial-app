@@ -73,7 +73,7 @@ final class AccountController extends ApiController
     {
         $this->requireAuth();
         try {
-            return $this->success($this->serializeAccount($this->service->findById((int)$id, $this->userId()), []));
+            return $this->success($this->serializeAccount($this->service->findById((string) $id, $this->userId()), []));
         } catch (\RuntimeException $e) {
             return $this->error($e->getMessage(), 404);
         }
@@ -94,7 +94,7 @@ final class AccountController extends ApiController
     {
         $this->requireAuth();
         try {
-            $a = $this->service->update((int)$id, $this->userId(), AccountDTO::fromRequest($this->body(), $this->userId()));
+            $a = $this->service->update((string) $id, $this->userId(), AccountDTO::fromRequest($this->body(), $this->userId()));
             return $this->success($this->serializeAccount($a, []), 'Conta atualizada.');
         } catch (\Exception $e) {
             return $this->error($e->getMessage());
@@ -105,7 +105,7 @@ final class AccountController extends ApiController
     {
         $this->requireAuth();
         try {
-            $this->service->delete((int)$id, $this->userId());
+            $this->service->delete((string) $id, $this->userId());
             return $this->success(null, 'Conta excluída.');
         } catch (\RuntimeException $e) {
             return $this->error($e->getMessage(), 404);

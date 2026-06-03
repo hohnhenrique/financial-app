@@ -29,9 +29,9 @@ abstract class ApiController
         return $this->json(['success' => false, 'message' => $message, 'errors' => $errors], $status);
     }
 
-    protected function userId(): int
+    protected function userId(): string
     {
-        return (int) $this->session->get('user_id');
+        return (string) $this->session->get('user_id');
     }
 
     protected function body(): array

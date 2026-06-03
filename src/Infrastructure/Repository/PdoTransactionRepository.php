@@ -24,7 +24,7 @@ final class PdoTransactionRepository extends AbstractRepository implements Trans
 
     // ── Filtros e ordenação ───────────────────────────────────────────────────
 
-    private function buildFilters(int $userId, array $filters): array
+    private function buildFilters(string $userId, array $filters): array
     {
         $where    = ['t.deleted_at IS NULL', 't.user_id = ?'];
         $bindings = [$userId];
@@ -73,7 +73,7 @@ final class PdoTransactionRepository extends AbstractRepository implements Trans
 
     // ── Interface ─────────────────────────────────────────────────────────────
 
-    public function findById(int $id, int $userId): ?Transaction
+    public function findById(string $id, string $userId): ?Transaction
     {
         $row = $this->fetchOne(
             self::BASE_SELECT . ' WHERE t.id = ? AND t.user_id = ? AND t.deleted_at IS NULL',
@@ -82,7 +82,7 @@ final class PdoTransactionRepository extends AbstractRepository implements Trans
         return $row ? Transaction::fromArray($row) : null;
     }
 
-    public function findByUser(int $userId, array $filters = []): array
+    public function findByUser(string $userId, array $filters = []): array
     {
         [$where, $bindings] = $this->buildFilters($userId, $filters);
         $order              = $this->buildOrder($filters);
@@ -92,7 +92,7 @@ final class PdoTransactionRepository extends AbstractRepository implements Trans
         );
     }
 
-    public function findByUserPaginated(int $userId, int $page, int $perPage, array $filters = []): array
+    public function findByUserPaginated(string $userId, int $page, int $perPage, array $filters = []): array
     {
         [$where, $bindings] = $this->buildFilters($userId, $filters);
         $order              = $this->buildOrder($filters);
@@ -107,7 +107,7 @@ final class PdoTransactionRepository extends AbstractRepository implements Trans
         );
     }
 
-    public function countByUser(int $userId, array $filters = []): int
+    public function countByUser(string $userId, array $filters = []): int
     {
         [$where, $bindings] = $this->buildFilters($userId, $filters);
         return (int) $this->fetchScalar(
@@ -116,7 +116,7 @@ final class PdoTransactionRepository extends AbstractRepository implements Trans
         );
     }
 
-    public function monthlySummary(int $userId, string $yearMonth): array
+    public function monthlySummary(string $userId, string $yearMonth): array
     {
         return $this->fetchOne("
             SELECT
@@ -128,7 +128,7 @@ final class PdoTransactionRepository extends AbstractRepository implements Trans
         ", [$userId, $yearMonth]) ?? ['total_income' => 0, 'total_expense' => 0];
     }
 
-    public function last6MonthsChart(int $userId): array
+    public function last6MonthsChart(string $userId): array
     {
         return $this->fetchAll("
             SELECT
@@ -146,7 +146,7 @@ final class PdoTransactionRepository extends AbstractRepository implements Trans
         ", [$userId]);
     }
 
-    public function expensesByCategory(int $userId, string $yearMonth): array
+    public function expensesByCategory(string $userId, string $yearMonth): array
     {
         return $this->fetchAll("
             SELECT c.name, c.color, SUM(t.amount_cents) AS total
@@ -160,7 +160,7 @@ final class PdoTransactionRepository extends AbstractRepository implements Trans
         ", [$userId, $yearMonth]);
     }
 
-    public function reportByCategory(int $userId, array $filters): array
+    public function reportByCategory(string $userId, array $filters): array
     {
         [$where, $bindings] = $this->buildFilters($userId, $filters);
         return $this->fetchAll("
@@ -196,10 +196,10 @@ final class PdoTransactionRepository extends AbstractRepository implements Trans
 
         Logger::info('Transaction created', ['id' => $id, 'user' => $dto->userId, 'amount' => $dto->amountCents()]);
 
-        return $this->findById((int) $id, $dto->userId);
+        return $this->findById((string) $id, $dto->userId);
     }
 
-    public function update(int $id, int $userId, TransactionDTO $dto): Transaction
+    public function update(string $id, string $userId, TransactionDTO $dto): Transaction
     {
         $this->table('transactions')
             ->where('id', $id)
@@ -221,7 +221,7 @@ final class PdoTransactionRepository extends AbstractRepository implements Trans
         return $this->findById($id, $userId);
     }
 
-    public function delete(int $id, int $userId): bool
+    public function delete(string $id, string $userId): bool
     {
         $affected = $this->table('transactions')
             ->where('id', $id)

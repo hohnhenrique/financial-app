@@ -7,10 +7,10 @@ namespace App\Domain\Transaction;
 final class Transaction
 {
     public function __construct(
-        public readonly int     $id,
-        public readonly int     $userId,
-        public readonly int     $accountId,
-        public readonly int     $categoryId,
+        public readonly string  $id,
+        public readonly string  $userId,
+        public readonly string  $accountId,
+        public readonly string  $categoryId,
         public readonly string  $type,
         public readonly int     $amountCents,
         public readonly string  $description,
@@ -26,10 +26,10 @@ final class Transaction
     public static function fromArray(array $data): self
     {
         return new self(
-            id:              (int) $data['id'],
-            userId:          (int) $data['user_id'],
-            accountId:       (int) $data['account_id'],
-            categoryId:      (int) $data['category_id'],
+            id:              (string) $data['id'],
+            userId:          (string) $data['user_id'],
+            accountId:       (string) $data['account_id'],
+            categoryId:      (string) $data['category_id'],
             type:            $data['type'],
             amountCents:     (int) $data['amount_cents'],
             description:     $data['description'],

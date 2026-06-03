@@ -7,8 +7,8 @@ namespace App\Domain\Category;
 final class Category
 {
     public function __construct(
-        public readonly int     $id,
-        public readonly ?int    $userId,
+        public readonly string     $id,
+        public readonly ?string    $userId,
         public readonly string  $name,
         public readonly string  $type,
         public readonly string  $color,
@@ -20,8 +20,8 @@ final class Category
     public static function fromArray(array $data): self
     {
         return new self(
-            id:         (int) $data['id'],
-            userId:     isset($data['user_id']) ? (int) $data['user_id'] : null,
+            id:         (string) $data['id'],
+            userId:     isset($data['user_id']) ? (string) $data['user_id'] : null,
             name:       $data['name'],
             type:       $data['type'],
             color:      $data['color']       ?? '#1B4F8A',
