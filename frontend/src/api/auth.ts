@@ -5,9 +5,11 @@ export const authApi = {
   login: (email: string, password: string) =>
     client.post<ApiResponse<User>>('/auth/login', { email, password }),
 
-  register: (name: string, email: string, password: string) =>
-    client.post<ApiResponse<User>>('/auth/register', { name, email, password }),
-
+  register: (name: string, email: string, password: string, inviteToken?: string) =>
+      client.post<ApiResponse<User>>('/auth/register', {
+        name, email, password,
+        ...(inviteToken ? { invite_token: inviteToken } : {}),
+      }),
   logout: () =>
     client.post<ApiResponse>('/auth/logout'),
 

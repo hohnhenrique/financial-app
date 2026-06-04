@@ -29,6 +29,7 @@ export function PersonalGoalsPage() {
   const [form, setForm] = useState<Partial<PersonalGoal>>(EMPTY)
   const [editing, setEditing] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState('')
+  const [showForm, setShowForm] = useState(false)
 
   const { data: goals }      = useQuery({ queryKey: ['personal-goals', filterStatus], queryFn: () => personalApi.goals.list(filterStatus || undefined).then(r => r.data.data) })
   const { data: priorities } = useQuery({ queryKey: ['priorities'], queryFn: () => personalApi.priorities().then(r => r.data.data) })
@@ -60,51 +61,56 @@ export function PersonalGoalsPage() {
               {{ '': 'Todas', active: 'Ativas', completed: 'Concluídas', paused: 'Pausadas' }[s]}
             </button>
           ))}
+          <Button size="sm" onClick={() => { setShowForm(v => !v); setEditing(null); setForm(EMPTY) }}>
+            {showForm ? '× Fechar' : '+ Nova Meta'}
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[380px_1fr] gap-6">
+      <div className="grid gap-6">
         {/* Form */}
-        <Card title={editing ? 'Editar Meta' : 'Nova Meta'} padding>
-          <div className="space-y-4">
-            <Input label="Título" value={form.title ?? ''} onChange={e => set({ title: e.target.value })} placeholder="Ex: Correr 5km, Economizar R$10k" required />
-            <Select label="Categoria" options={CATEGORIES} value={form.category ?? 'outros'} onChange={e => set({ category: e.target.value })} />
-            <Select label="Prioridade" options={priorityOptions} value={form.priority_id ?? ''} onChange={e => set({ priority_id: e.target.value })} placeholder="Selecione..." />
+        {showForm && (
+          <Card title={editing ? 'Editar Meta' : 'Nova Meta'} padding>
+            <div className="space-y-4">
+              <Input label="Título" value={form.title ?? ''} onChange={e => set({ title: e.target.value })} placeholder="Ex: Correr 5km, Economizar R$10k" required />
+              <div className="grid grid-cols-3 gap-3">
+                <Select label="Categoria" options={CATEGORIES} value={form.category ?? 'outros'} onChange={e => set({ category: e.target.value })} />
+                <Select label="Prioridade" options={priorityOptions} value={form.priority_id ?? ''} onChange={e => set({ priority_id: e.target.value })} placeholder="Selecione..." />
+                <Input label="Prazo" type="date" value={form.deadline ?? ''} onChange={e => set({ deadline: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <Input label="Meta" type="number" value={String(form.target_value ?? 100)} onChange={e => set({ target_value: +e.target.value })} />
+                <Select label="Unidade" options={UNITS} value={form.unit ?? '%'} onChange={e => set({ unit: e.target.value })} />
+                <Input label="Progresso atual" type="number" value={String(form.current_value ?? 0)} onChange={e => set({ current_value: +e.target.value })} />
+              </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Input label="Meta" type="number" value={String(form.target_value ?? 100)} onChange={e => set({ target_value: +e.target.value })} />
-              <Select label="Unidade" options={UNITS} value={form.unit ?? '%'} onChange={e => set({ unit: e.target.value })} />
-            </div>
+              {editing && <Select label="Status" options={STATUSES} value={form.status ?? 'active'} onChange={e => set({ status: e.target.value })} />}
 
-            <Input label="Progresso atual" type="number" value={String(form.current_value ?? 0)} onChange={e => set({ current_value: +e.target.value })} />
-            <Input label="Prazo" type="date" value={form.deadline ?? ''} onChange={e => set({ deadline: e.target.value })} />
+              <div>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">Cor</label>
+                <div className="flex gap-2 flex-wrap">
+                  {['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'].map(c => (
+                    <button key={c} onClick={() => set({ color: c })}
+                      className={`w-8 h-8 rounded-lg transition-all ${form.color === c ? 'ring-2 ring-offset-2 ring-slate-400 scale-110' : ''}`}
+                      style={{ background: c }} />
+                  ))}
+                </div>
+              </div>
 
-            {editing && <Select label="Status" options={STATUSES} value={form.status ?? 'active'} onChange={e => set({ status: e.target.value })} />}
-
-            <div>
-              <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">Cor</label>
-              <div className="flex gap-2 flex-wrap">
-                {['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'].map(c => (
-                  <button key={c} onClick={() => set({ color: c })}
-                    className={`w-8 h-8 rounded-lg transition-all ${form.color === c ? 'ring-2 ring-offset-2 ring-slate-400 scale-110' : ''}`}
-                    style={{ background: c }} />
-                ))}
+              <div className="flex gap-2">
+                {editing && <Button variant="secondary" onClick={() => { setEditing(null); setForm(EMPTY) }} className="flex-1">Cancelar</Button>}
+                <Button onClick={() => editing ? updateMut.mutate() : createMut.mutate()} loading={createMut.isPending || updateMut.isPending} className="flex-1">
+                  {editing ? 'Salvar' : 'Criar Meta'}
+                </Button>
               </div>
             </div>
-
-            <div className="flex gap-2">
-              {editing && <Button variant="secondary" onClick={() => { setEditing(null); setForm(EMPTY) }} className="flex-1">Cancelar</Button>}
-              <Button onClick={() => editing ? updateMut.mutate() : createMut.mutate()} loading={createMut.isPending || updateMut.isPending} className="flex-1">
-                {editing ? 'Salvar' : 'Criar Meta'}
-              </Button>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        )}
 
         {/* Grid de metas */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {(goals ?? []).length === 0
-            ? <div className="col-span-2 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-12 text-center text-slate-400 text-sm">Nenhuma meta encontrada.</div>
+            ? <div className="col-span-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-12 text-center text-slate-400 text-sm">Nenhuma meta encontrada.</div>
             : (goals ?? []).map(g => {
                 const p   = pct(g)
                 const done = p >= 100 || g.status === 'completed'

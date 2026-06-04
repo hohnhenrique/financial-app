@@ -8,7 +8,7 @@ interface AuthContextType {
   user: User | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  register: (name: string, email: string, password: string) => Promise<void>
+  register: (name: string, email: string, password: string, token?: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -63,24 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const register = async (name: string, email: string, password: string): Promise<void> => {
-    const res = await authApi.register(name, email, password)
+  const register = async (name: string, email: string, password: string, inviteToken?: string): Promise<void> => {
+    const res = await authApi.register(name, email, password, inviteToken)
     setUser(res.data.data)
-
-    try {
-      const me = await authApi.me()
-      const token = me.headers['x-csrf-token']
-      if (token) setCsrfToken(token)
-    } catch {
-      // ignora
-    }
   }
-
-  // const logout = async (): Promise<void> => {
-  //   await authApi.logout()
-  //   setUser(null)
-  //   setCsrfToken('') // limpa o token local ao sair
-  // }
 
   return (
       <AuthContext.Provider value={{ user, loading, login, register, logout }}>
